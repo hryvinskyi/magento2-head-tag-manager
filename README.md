@@ -54,6 +54,24 @@ bin/magento cache:clean
 $headTagManagerViewModel = $block->getData('head_tag_manager_view_model');
 $headManager = $headTagManagerViewModel->getManager();
 
+// Add preconnect link
+$headTagManagerViewModel->getManager()->addLink([
+    'rel' => 'preload',
+    'href' => 'https://example.com/image.jpg',
+    'as' => 'image',
+]);
+
+// Add prefetch link
+$headTagManagerViewModel->getManager()->addLink([
+    'rel' => 'prefetch',
+    'href' => '/landing-page',
+]);
+
+// Add DNS prefetch link
+$headTagManagerViewModel->getManager()->addLink([
+    'rel' => 'dns-prefetch',
+    'href' => 'https://fonts.googleapis.com/',
+]);
 
 // Add stylesheets (CSP compatible)
 $headManager->addStylesheet($block->getViewFileUrl('css/some-custom.css'));
