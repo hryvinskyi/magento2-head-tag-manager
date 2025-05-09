@@ -6,6 +6,13 @@
   "require": {
     "magento/framework": "*"
   },
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Volodymyr Hryvinskyi",
+      "email": "volodymyr@hryvinskyi.com"
+    }
+  ],
   "autoload": {
     "files": [
       "registration.php"
