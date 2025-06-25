@@ -1,16 +1,26 @@
 # Hryvinskyi_HeadTagManager
 
-A Magento 2 module for managing HTML head tags. This module allows you to dynamically add, modify, and render various HTML head elements like meta tags, stylesheets, scripts, and other elements.
+A Magento 2 module for managing HTML head tags with SOLID principles and advanced caching capabilities.
+This module allows you to dynamically add, modify, and render various HTML head elements like meta tags, stylesheets, scripts, and other elements.
 
 ## Overview
 
-The HeadTagManager module provides a flexible API for managing HTML head elements in Magento 2 applications. It allows you to:
+The HeadTagManager module provides a flexible, cache-aware API for managing HTML head elements in Magento 2 applications. Built with SOLID principles, it features:
+
+- **Cache-Aware Architecture**: Automatically handles caching of head elements to prevent miss renders on cached pages.
+- **SOLID Compliance**: Strategy pattern for element serialization, factory registry for element creation.
+- **Extensible Design**: Easy to add new head element types without modifying existing code
+- **CSP Compatible**: Full support for Magento Content Security Policy
+- **Performance Optimized**: Efficient element management and rendering
+
+### Key Features
 
 - Add preconnect and prefetch links
 - Add link elements (stylesheets, canonical, etc.)
-- Add inline and external scripts
-- Add inline styles
-- Supporting Magento CSP (Content Security Policy)
+- Add inline and external scripts with CSP support
+- Add inline styles with CSP support
+- Cache-aware element persistence
+- SOLID-compliant architecture for easy extension
 
 ## Installation
 
@@ -86,14 +96,48 @@ $headManager->addInlineScript('console.log("Hello, world!");');
 $headManager->addStyle('body { background-color: #f0f0f0; }');
 ```
 
+## Architecture
+
+### Cache Strategy
+
+The module implements a cache-aware architecture to solve the common issue where head elements are empty on cached page loads. The `HeadElementCacheStrategyInterface` provides:
+
+- Automatic element serialization and persistence
+- Cache loading on page initialization
+- Transparent cache management
+
+### SOLID Design Patterns
+
+**Strategy Pattern**: Element serialization uses strategies to handle different element types without instanceof checks:
+```php
+// Each element type has its own serialization strategy
+$strategy = $this->strategyRegistry->getStrategyForElement($element);
+$serializedData = $strategy->serialize($element, $key);
+```
+
+**Factory Registry Pattern**: Dynamic factory lookup replaces hardcoded match statements:
+```php
+// Factories are registered and retrieved dynamically
+$factory = $this->factoryRegistry->getFactoryByType('meta');
+$element = $factory->create($data);
+```
+
 ## API Reference
 
-### Main Interfaces
+### Core Interfaces
 
 - `HeadTagManagerInterface` - Main service for managing head elements
 - `HeadElementInterface` - Interface for all head elements
+- `HeadElementCacheStrategyInterface` - Cache strategy for element persistence
+- `HeadElementSerializerInterface` - Serialization service for cache storage
 
-### Head Element Types
+### Strategy Interfaces
+
+- `HeadElementSerializationStrategyInterface` - Strategy for element serialization
+- `SerializationStrategyRegistryInterface` - Registry for serialization strategies
+- `HeadElementFactoryRegistryInterface` - Registry for element factories
+
+### Element Types
 
 - `MetaElement` - HTML meta tags
 - `LinkElement` - HTML link tags (stylesheets, favicons, etc.)
@@ -110,9 +154,204 @@ $headManager->addStyle('body { background-color: #f0f0f0; }');
 - `addExternalScript(string $src, array $attributes = [], ?string $key = null)` - Add external script
 - `addInlineScript(string $content, array $attributes = [], ?string $key = null)` - Add inline script
 
+## Advanced Usage
+
+### Custom Elements
+
+To add support for a new head element type:
+
+1. **Create Element Class**: Implement `HeadElementInterface`
+2. **Create Factory**: Extend `AbstractHeadElementFactory`
+3. **Create Strategy**: Implement `HeadElementSerializationStrategyInterface`
+4. **Register via DI**: Add to `di.xml` configuration
+
+### Example Custom Element
+
+```php
+class CustomElement implements HeadElementInterface
+{
+    private $attributes;
+    private $content;
+
+    public function __construct(array $attributes, string $content)
+    {
+        $this->attributes = $attributes;
+        $this->content = $content;
+    }
+
+    public function getAttributes(): array
+    {
+        return $this->attributes;
+    }
+
+    public function getContent(): string
+    {
+        return $this->content;
+    }
+    
+    /**
+     * Render the head element as HTML
+     * @return string The HTML representation of the element
+     */
+    public function render(): string
+    {
+        $attributes = '';
+        foreach ($this->attributes as $key => $value) {
+            $attributes .= sprintf(' %s="%s"', htmlspecialchars($key), htmlspecialchars($value));
+        }
+        return sprintf('<custom-element%s>%s</custom-element>', $attributes, htmlspecialchars($this->content));
+    }
+}
+```
+
+### Custom Factory
+
+```php
+class CustomElementFactory extends extends AbstractHeadElementFactory
+{
+    /**
+     * @inheritDoc
+     */
+    public function create(array $data = []): HeadElementInterface
+    {
+        return new CustomElement(
+            $data['attributes'] ?? [],
+            $data['content'] ?? ''
+        );
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getElementType(): string
+    {
+        return 'custom';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getElementClassName(): string
+    {
+        return CustomElement::class;
+    }
+}
+```
+
+### Custom Serialization Strategy
+```php
+class CustomElementSerializationStrategy implements HeadElementSerializationStrategyInterface
+{
+    public function serialize(HeadElementInterface $element, string $key): array
+    {
+        return [
+            'type' => get_class($element),
+            'short_type' => $element->getElementType(),
+            'attributes' => $element->getAttributes(),
+            'content' => $element->getContent()
+        ];
+    }
+
+    public function getElementType(): string
+    {
+        return 'custom';
+    }
+}
+```
+
+### Custom Factory Registration
+To register your custom element and factory, add the following to your `di.xml`:
+
+```xml
+<type name="Hryvinskyi\HeadTagManager\Factory\HeadElementFactoryRegistry">
+    <arguments>
+        <argument name="factories" xsi:type="array">
+            <item name="custom" xsi:type="object">Vendor\Module\Factory\CustomElementFactory</item>
+        </argument>
+    </arguments>
+</type>
+<type name="Hryvinskyi\HeadTagManager\Strategy\SerializationStrategyRegistry">
+    <arguments>
+        <argument name="strategies" xsi:type="array">
+            <item name="custom" xsi:type="object">Vendor\Module\Strategy\CustomElementSerializationStrategy</item>
+        </argument>
+    </arguments>
+</type>
+```
+
+### Usage
+To use your custom element, simply call the factory from the `HeadTagManager`:
+
+```php
+$headTagManager->createElement('custom', [
+    'attributes' => ['data-custom' => 'value'],
+    'content' => 'Custom Content'
+], 'custom_key');
+```
+
+
+
+### Cache Strategy Implementation
+
+Implement custom cache strategies by implementing `HeadElementCacheStrategyInterface`:
+
+```php
+class CustomCacheStrategy implements HeadElementCacheStrategyInterface
+{
+    public function load(): array { /* custom loading logic */ }
+    public function save(array $elements): bool { /* custom saving logic */ }
+    public function clear(): bool { /* custom clearing logic */ }
+}
+```
+
+### Element Serialization
+
+Custom serialization strategies allow for element-specific handling:
+
+```php
+class CustomElementStrategy implements HeadElementSerializationStrategyInterface
+{
+    public function serialize(HeadElementInterface $element, string $key): array
+    {
+        return [
+            'type' => get_class($element),
+            'short_type' => $this->getElementType(),
+            'attributes' => $element->getAttributes(),
+            'content' => $this->extractContent($element)
+        ];
+    }
+}
+```
+
 ## Integration
 
 The module automatically injects head elements at the `<!-- {{HRYVINSKYI:PLACEHOLDER:HEAD_ADDITIONAL}} -->` placeholder in your HTML output.
+
+## Version History
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history and migration notes.
+
+## Testing
+
+The module includes comprehensive test coverage:
+
+- **Unit Tests**: All core classes and interfaces
+- **Integration Tests**: End-to-end functionality
+- **Strategy Tests**: Serialization strategy validation
+- **Cache Tests**: Cache-aware functionality
+
+Run tests with:
+```bash
+vendor/bin/phpunit vendor/hryvinskyi/magento2-head-tag-manager/Test/Unit
+```
+
+## Contributing
+
+Contributions are welcome! Please ensure:
+- All tests pass
+- New features include tests
+- Code follows SOLID principles
+- Documentation is updated
 
 ## License
 

@@ -14,12 +14,25 @@ use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 interface HeadTagManagerInterface
 {
     /**
+     * Create a new head element
+     * @param string $type Element type (e.g., 'meta', 'link', 'style', 'script')
+     * @param array $data Element data (attributes, content, etc.)
+     * @param string|null $key Optional key for replacing/removing element later
+     * @return HeadElementInterface
+     */
+    public function createElement(
+        string $type,
+        array $data = [],
+        ?string $key = null
+    ): HeadElementInterface;
+
+    /**
      * Add a head element
      * @param HeadElementInterface $element Head element
-     * @param string|null $key Optional key for replacing/removing element later
+     * @param string $key Key for replacing/removing element later
      * @return $this
      */
-    public function addElement(HeadElementInterface $element, ?string $key = null): HeadTagManagerInterface;
+    public function addElement(HeadElementInterface $element, string $key): HeadTagManagerInterface;
 
     /**
      * Remove an element by key
@@ -151,4 +164,14 @@ interface HeadTagManagerInterface
      * @return array
      */
     public function getRenderedElements(): array;
+
+    /**
+     * Generate a unique key for an element based on type and data
+     *
+     * @param string $type Element type (e.g., 'meta', 'link', 'script')
+     * @param array $data Element data (attributes, content, etc.)
+     *
+     * @return string Unique key for the element
+     */
+    public function generateElementKey(string $type, array $data): string;
 }
