@@ -114,8 +114,9 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function addMeta(array $attributes, ?string $key = null): self
     {
-        $element = $this->createElement('meta', ['attributes' => $attributes]);
-        return $this->addElement($element, $key);
+        $this->createElement('meta', ['attributes' => $attributes], $key);
+
+        return $this;
     }
 
     /**
@@ -125,8 +126,9 @@ class HeadTagManager implements HeadTagManagerInterface
     {
         $data = ['attributes' => ['name' => $name, 'content' => $content]];
         $metaKey = $key ?? $this->generateElementKey('meta', $data);
-        $element = $this->createElement('meta', $data);
-        return $this->addElement($element, $metaKey);
+        $this->createElement('meta', $data, $metaKey);
+
+        return $this;
     }
 
     /**
@@ -136,8 +138,9 @@ class HeadTagManager implements HeadTagManagerInterface
     {
         $data = ['attributes' => ['property' => $property, 'content' => $content]];
         $metaKey = $key ?? $this->generateElementKey('meta', $data);
-        $element = $this->createElement('meta', $data);
-        return $this->addElement($element, $metaKey);
+        $this->createElement('meta', $data, $metaKey);
+
+        return $this;
     }
 
     /**
@@ -146,8 +149,9 @@ class HeadTagManager implements HeadTagManagerInterface
     public function addCharset(string $charset = 'UTF-8'): self
     {
         $data = ['attributes' => ['charset' => $charset]];
-        $element = $this->createElement('meta', $data);
-        return $this->addElement($element, 'charset');
+        $this->createElement('meta', $data, 'charset');
+
+        return $this;
     }
 
     /**
@@ -155,8 +159,9 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function addLink(array $attributes, ?string $key = null): self
     {
-        $element = $this->createElement('link', ['attributes' => $attributes]);
-        return $this->addElement($element, $key);
+        $this->createElement('link', ['attributes' => $attributes], $key);
+
+        return $this;
     }
 
     /**
@@ -166,8 +171,9 @@ class HeadTagManager implements HeadTagManagerInterface
     {
         $data = ['attributes' => ['rel' => 'stylesheet', 'href' => $href] + $attributes];
         $cssKey = $key ?? $this->generateElementKey('link', $data);
-        $element = $this->createElement('link', $data);
-        return $this->addElement($element, $cssKey);
+        $this->createElement('link', $data, $cssKey);
+
+        return $this;
     }
 
     /**
@@ -176,9 +182,10 @@ class HeadTagManager implements HeadTagManagerInterface
     public function addScript(array $attributes, ?string $content = null, ?string $key = null): self
     {
         $data = ['attributes' => $attributes, 'content' => $content];
-        $element = $this->createElement('script', $data);
         $key = $key ?? $this->generateElementKey('script', $data);
-        return $this->addElement($element, $key);
+        $this->createElement('script', $data, $key);
+
+        return $this;
     }
 
     /**
@@ -188,8 +195,9 @@ class HeadTagManager implements HeadTagManagerInterface
     {
         $data = ['attributes' => ['src' => $src] + $attributes];
         $scriptKey = $key ?? $this->generateElementKey('script', $data);
-        $element = $this->createElement('script', $data);
-        return $this->addElement($element, $scriptKey);
+        $this->createElement('script', $data, $scriptKey);
+
+        return $this;
     }
 
     /**
@@ -199,8 +207,9 @@ class HeadTagManager implements HeadTagManagerInterface
     {
         $data = ['attributes' => $attributes, 'content' => $content];
         $scriptKey = $key ?? $this->generateElementKey('script', $data);
-        $element = $this->createElement('script', $data);
-        return $this->addElement($element, $scriptKey);
+        $this->createElement('script', $data, $scriptKey);
+
+        return $this;
     }
 
     /**
@@ -210,8 +219,9 @@ class HeadTagManager implements HeadTagManagerInterface
     {
         $data = ['attributes' => $attributes, 'content' => $content];
         $styleKey = $key ?? $this->generateElementKey('style', $data);
-        $element = $this->createElement('style', $data);
-        return $this->addElement($element, $styleKey);
+        $this->createElement('style', $data, $styleKey);
+
+        return $this;
     }
 
     /**

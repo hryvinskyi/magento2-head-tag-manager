@@ -28,6 +28,7 @@
             <argument name="enabled" xsi:type="boolean">true</argument>
             <argument name="cacheLifetime" xsi:type="number">2592000</argument> <!-- 30 days -->
             <argument name="cacheKeyPrefix" xsi:type="string">hryvinskyi_head_tag_manager_</argument>
+            <argument name="cache" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Cache\Type</argument>
         </arguments>
     </type>
 
