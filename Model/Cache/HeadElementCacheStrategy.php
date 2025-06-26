@@ -11,8 +11,8 @@ namespace Hryvinskyi\HeadTagManager\Model\Cache;
 
 use Hryvinskyi\HeadTagManager\Api\Cache\HeadElementCacheStrategyInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\HeadElementSerializerInterface;
-use Magento\Framework\App\CacheInterface;
 use Magento\Framework\App\PageCache\Identifier;
+use Magento\Framework\Cache\FrontendInterface;
 use Magento\Framework\Serialize\SerializerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -25,7 +25,7 @@ class HeadElementCacheStrategy implements HeadElementCacheStrategyInterface
     private array $cachedElements = [];
 
     public function __construct(
-        private readonly CacheInterface $cache,
+        private readonly FrontendInterface $cache,
         private readonly SerializerInterface $serializer,
         private readonly HeadElementSerializerInterface $elementSerializer,
         private readonly Identifier $identifier,
@@ -48,7 +48,6 @@ class HeadElementCacheStrategy implements HeadElementCacheStrategyInterface
         try {
             $cacheKey = $this->getCacheKey();
             $cachedData = $this->cache->load($cacheKey);
-
             if ($cachedData) {
                 $elementsData = $this->serializer->unserialize($cachedData);
                 $this->cachedElements = $this->elementSerializer->unserialize($elementsData);
