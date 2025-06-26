@@ -47,4 +47,20 @@ class NullCacheStrategy implements HeadElementCacheStrategyInterface
     {
         return false;
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function getCacheTags(): array
+    {
+        return []; // No cache tags for null strategy
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getCacheKey(): string
+    {
+        return 'null_cache_strategy'; // Unique key for this strategy
+    }
 }
