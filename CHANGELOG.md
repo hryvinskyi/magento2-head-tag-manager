@@ -57,6 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Link element management
 - Element rendering and output
 
-[2.0.1]: https://github.com/hryvinskyi/magento2-head-tag-manager/compare/v2.0.0...v2.0.1
-[2.0.0]: https://github.com/hryvinskyi/magento2-head-tag-manager/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/hryvinskyi/magento2-head-tag-manager/releases/tag/v1.0.0
+[2.0.1]: https://github.com/hryvinskyi/magento2-head-tag-manager/compare/2.0.0...2.0.1
+[2.0.0]: https://github.com/hryvinskyi/magento2-head-tag-manager/compare/1.0.0...2.0.0
+[1.0.0]: https://github.com/hryvinskyi/magento2-head-tag-manager/releases/tag/1.0.0
