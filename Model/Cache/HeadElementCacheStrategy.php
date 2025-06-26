@@ -12,8 +12,10 @@ namespace Hryvinskyi\HeadTagManager\Model\Cache;
 use Hryvinskyi\HeadTagManager\Api\Cache\HeadElementCacheStrategyInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\HeadElementSerializerInterface;
 use Magento\Framework\App\CacheInterface;
+use Magento\Framework\App\PageCache\Identifier;
 use Magento\Framework\Serialize\SerializerInterface;
 use Psr\Log\LoggerInterface;
+
 class HeadElementCacheStrategy implements HeadElementCacheStrategyInterface
 {
     private const CACHE_KEY_PREFIX = 'hryvinskyi_head_tag_manager_';
@@ -26,6 +28,7 @@ class HeadElementCacheStrategy implements HeadElementCacheStrategyInterface
         private readonly CacheInterface $cache,
         private readonly SerializerInterface $serializer,
         private readonly HeadElementSerializerInterface $elementSerializer,
+        private readonly Identifier $identifier,
         private readonly LoggerInterface $logger,
         private readonly bool $enabled = true,
         private readonly int $cacheLifetime = self::DEFAULT_CACHE_LIFETIME,
@@ -83,7 +86,7 @@ class HeadElementCacheStrategy implements HeadElementCacheStrategyInterface
             $result = $this->cache->save(
                 $serializedData,
                 $cacheKey,
-                self::CACHE_TAGS,
+                $this->getCacheTags(),
                 $this->cacheLifetime
             );
 
@@ -148,10 +151,18 @@ class HeadElementCacheStrategy implements HeadElementCacheStrategyInterface
     }
 
     /**
-     * Get cache key
+     * @inheritDoc
      */
-    private function getCacheKey(): string
+    public function getCacheTags(): array
     {
-        return $this->cacheKeyPrefix . 'elements';
+        return self::CACHE_TAGS;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getCacheKey(): string
+    {
+        return $this->cacheKeyPrefix . $this->identifier->getValue();
     }
 }

@@ -41,4 +41,18 @@ interface HeadElementCacheStrategyInterface
      * @return bool
      */
     public function isEnabled(): bool;
+
+    /**
+     * Get cache tags
+     *
+     * @return string[]
+     */
+    public function getCacheTags(): array;
+
+    /**
+     * Get cache key
+     *
+     * @return string
+     */
+    public function getCacheKey(): string;
 }
