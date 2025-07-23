@@ -10,10 +10,15 @@
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
-        <referenceBlock name="head.additional">
-            <block name="hryvinskyi_theme_head_additional"
-                   template="Hryvinskyi_HeadTagManager::head_additional_placeholder.phtml"
-                   before="-"/>
+        <referenceBlock name="require.js">
+            <action method="setTemplate">
+                <argument name="template"
+                          xsi:type="string">Hryvinskyi_HeadTagManager::head_additional_placeholder.phtml</argument>
+            </action>
+            <container name="before_head_additional">
+                <block name="require.js.origional" template="Magento_Theme::page/js/require_js.phtml" />
+            </container>
+            <container name="after_head_additional"/>
         </referenceBlock>
     </body>
 </page>

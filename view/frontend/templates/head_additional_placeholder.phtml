@@ -7,4 +7,8 @@
 
 declare(strict_types=1);
 
+/** @var \Magento\Framework\View\Element\Template $block */
+
+echo $block->getChildHtml('before_head_additional');
 echo '<' . '!-- {{HRYVINSKYI:PLACEHOLDER:HEAD_ADDITIONAL}} --' . '>';
+echo $block->getChildHtml('after_head_additional');
