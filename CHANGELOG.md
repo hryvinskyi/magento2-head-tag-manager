@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-07-25
+### Added
+- **Block-Level Caching System**: Implemented comprehensive block caching detection and tracking
+  - New `BlockCacheDetectorInterface` for detecting block cache status
+  - New `HeadElementTrackerInterface` for tracking head elements per block
+  - New `BlockHeadElementCacheInterface` for block-specific head element caching
+- **Event-Driven Architecture**: Added observers for block HTML rendering lifecycle
+  - `BlockHtmlBeforeObserver` - Handles head element tracking before block rendering
+  - `BlockHtmlAfterObserver` - Manages head element persistence after block rendering
+  - Event observers for `view_block_abstract_to_html_before` and `view_block_abstract_to_html_after`
+- **Enhanced Dependency Injection**: Extended DI configuration for new block caching interfaces
+- **Improved Cache Strategy**: Better handling of head elements in cached block contexts
+
+### Changed
+- Enhanced block-level cache detection and element tracking capabilities
+- Improved integration with Magento's block rendering lifecycle
+
 ## [2.0.3] - 2025-07-23
 ### Added
 - Moved placeholder elements to require.js block

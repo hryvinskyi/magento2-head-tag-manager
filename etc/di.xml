@@ -21,6 +21,12 @@
                 type="Hryvinskyi\HeadTagManager\Model\Registry\HeadElementFactoryRegistry"/>
     <preference for="Hryvinskyi\HeadTagManager\Api\Serializer\Strategy\SerializationStrategyRegistryInterface"
                 type="Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\SerializationStrategyRegistry"/>
+    <preference for="Hryvinskyi\HeadTagManager\Api\Block\BlockCacheDetectorInterface"
+                type="Hryvinskyi\HeadTagManager\Model\Block\BlockCacheDetector"/>
+    <preference for="Hryvinskyi\HeadTagManager\Api\Block\HeadElementTrackerInterface"
+                type="Hryvinskyi\HeadTagManager\Model\Block\HeadElementTracker"/>
+    <preference for="Hryvinskyi\HeadTagManager\Api\Cache\BlockHeadElementCacheInterface"
+                type="Hryvinskyi\HeadTagManager\Model\Cache\BlockHeadElementCache"/>
 
     <!-- Cache Strategy Configuration -->
     <type name="Hryvinskyi\HeadTagManager\Model\Cache\HeadElementCacheStrategy">
