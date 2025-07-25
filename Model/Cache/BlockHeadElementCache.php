@@ -50,7 +50,7 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
             $result = $this->cache->save(
                 $serializedData,
                 $cacheKey,
-                array_merge(self::CACHE_TAGS, [$block->getNameInLayout()]),
+                array_merge(self::CACHE_TAGS, $this->generateCacheTags($block)),
                 self::CACHE_LIFETIME
             );
 
@@ -142,5 +142,20 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
         // Use the block's own cache key to ensure proper cache invalidation
         $blockCacheKey = $block->getCacheKey();
         return self::CACHE_KEY_PREFIX . md5($blockCacheKey);
+    }
+
+    /**
+     * Generate cache tags for block-specific head elements
+     *
+     * @param AbstractBlock $block
+     * @return array
+     * @throws \ReflectionException
+     */
+    private function generateCacheTags(AbstractBlock $block): array
+    {
+        $reflection = new \ReflectionClass($block);
+        $method = $reflection->getMethod('getCacheTags');
+        $method->setAccessible(true);
+        return $method->invoke($block);
     }
 }
