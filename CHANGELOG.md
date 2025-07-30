@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] - 2025-07-30
+### Added
+- **Refactoring**: Improved `Plugin/Framework/App/Response/Http.php` to prevent trying to render head elements in non-HTML responses
+
+## [2.1.1] - 2025-07-25
+### Added
+- **Improved caching**: Enhanced block-level caching key generation
+
 ## [2.1.0] - 2025-07-25
 ### Added
 - **Block-Level Caching System**: Implemented comprehensive block caching detection and tracking

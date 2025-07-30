@@ -121,9 +121,23 @@
         </arguments>
     </virtualType>
 
+    <!-- Plugin for HTTP Response Head Tag Injection -->
     <type name="Magento\Framework\App\Response\Http">
-        <plugin name="hryvinskyi-head-additional-tags-render"
+        <plugin name="hryvinskyi_head_tag_manager_response_injection"
                 type="Hryvinskyi\HeadTagManager\Plugin\Framework\App\Response\Http"
-                sortOrder="9000"/>
+                sortOrder="9000"
+                disabled="false"/>
+    </type>
+
+    <!-- Plugin Configuration -->
+    <type name="Hryvinskyi\HeadTagManager\Plugin\Framework\App\Response\Http">
+        <arguments>
+            <argument name="skipClasses" xsi:type="array">
+                <!-- Skip file download responses -->
+                <item name="file_interface" xsi:type="string">Magento\Framework\App\Response\FileInterface</item>
+                <!-- Add more classes to skip if needed -->
+                <!-- <item name="redirect_interface" xsi:type="string">Magento\Framework\App\Response\RedirectInterface</item> -->
+            </argument>
+        </arguments>
     </type>
 </config>
