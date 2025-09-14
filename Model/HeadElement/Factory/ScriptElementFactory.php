@@ -11,7 +11,7 @@ namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElement;
-use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElementFactory as MagentoScriptElementFactory;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Factory for creating ScriptElement instances
@@ -19,7 +19,7 @@ use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElementFactory as MagentoS
 class ScriptElementFactory extends AbstractHeadElementFactory
 {
     public function __construct(
-        private readonly MagentoScriptElementFactory $magentoFactory
+        private readonly SecureHtmlRenderer $secureHtmlRenderer
     ) {
     }
 
@@ -28,7 +28,9 @@ class ScriptElementFactory extends AbstractHeadElementFactory
      */
     public function create(array $data = []): HeadElementInterface
     {
-        return $this->magentoFactory->create($data);
+        $attributes = $data['attributes'] ?? [];
+        $content = $data['content'] ?? null;
+        return new ScriptElement($this->secureHtmlRenderer, $attributes, $content);
     }
 
     /**

@@ -46,4 +46,19 @@ interface HeadElementTrackerInterface
      * @return string|null
      */
     public function getCurrentTrackingBlock(): ?string;
+
+    /**
+     * Check if a block is currently being tracked
+     *
+     * @param AbstractBlock $block
+     * @return bool
+     */
+    public function isBlockBeingTracked(AbstractBlock $block): bool;
+
+    /**
+     * Get current tracking level
+     *
+     * @return int
+     */
+    public function getTrackingLevel(): int;
 }

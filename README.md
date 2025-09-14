@@ -1,15 +1,13 @@
-# Hryvinskyi_HeadTagManager
+# Adobe Commerce / Magento 2 Head Tag Manager Module
 
-A Magento 2 module for managing HTML head tags with SOLID principles and advanced caching capabilities.
+[![Latest Stable Version](https://poser.pugx.org/hryvinskyi/magento2-head-tag-manager/v/stable)](https://packagist.org/packages/hryvinskyi/magento2-head-tag-manager)
+[![Total Downloads](https://poser.pugx.org/hryvinskyi/magento2-head-tag-manager/downloads)](https://packagist.org/packages/hryvinskyi/magento2-head-tag-manager)
+[![License](https://poser.pugx.org/hryvinskyi/magento2-head-tag-manager/license)](https://packagist.org/packages/hryvinskyi/magento2-head-tag-manager)
+
+This module provides a robust solution for managing HTML head elements in Adobe Commerce / Magento 2 applications.
 This module allows you to dynamically add, modify, and render various HTML head elements like meta tags, stylesheets, scripts, and other elements.
 
-## Overview
-
-The HeadTagManager module provides a flexible, cache-aware API for managing HTML head elements in Magento 2 applications. Built with SOLID principles, it features:
-
-- **Cache-Aware Architecture**: Automatically handles caching of head elements to prevent miss renders on cached pages.
-- **SOLID Compliance**: Strategy pattern for element serialization, factory registry for element creation.
-- **Extensible Design**: Easy to add new head element types without modifying existing code
+### Features:
 - **CSP Compatible**: Full support for Magento Content Security Policy
 - **Performance Optimized**: Efficient element management and rendering
 
@@ -19,8 +17,6 @@ The HeadTagManager module provides a flexible, cache-aware API for managing HTML
 - Add link elements (stylesheets, canonical, etc.)
 - Add inline and external scripts with CSP support
 - Add inline styles with CSP support
-- Cache-aware element persistence
-- SOLID-compliant architecture for easy extension
 
 ## Installation
 
@@ -58,7 +54,7 @@ bin/magento cache:clean
 </block>
 ```
 
-```php
+```PHP
 <?php
 /** @var \Hryvinskyi\HeadTagManager\ViewModel\HeadTagManagerViewModel $headTagManagerViewModel */
 $headTagManagerViewModel = $block->getData('head_tag_manager_view_model');
@@ -100,49 +96,7 @@ $headManager->addStyle('body { background-color: #f0f0f0; }');
 
 ### Cache Strategy
 
-The module implements a cache-aware architecture to solve the common issue where head elements are empty on cached page loads. The `HeadElementCacheStrategyInterface` provides:
-
-- Automatic element serialization and persistence
-- Cache loading on page initialization
-- Transparent cache management
-
-### SOLID Design Patterns
-
-**Strategy Pattern**: Element serialization uses strategies to handle different element types without instanceof checks:
-```php
-// Each element type has its own serialization strategy
-$strategy = $this->strategyRegistry->getStrategyForElement($element);
-$serializedData = $strategy->serialize($element, $key);
-```
-
-**Factory Registry Pattern**: Dynamic factory lookup replaces hardcoded match statements:
-```php
-// Factories are registered and retrieved dynamically
-$factory = $this->factoryRegistry->getFactoryByType('meta');
-$element = $factory->create($data);
-```
-
-## API Reference
-
-### Core Interfaces
-
-- `HeadTagManagerInterface` - Main service for managing head elements
-- `HeadElementInterface` - Interface for all head elements
-- `HeadElementCacheStrategyInterface` - Cache strategy for element persistence
-- `HeadElementSerializerInterface` - Serialization service for cache storage
-
-### Strategy Interfaces
-
-- `HeadElementSerializationStrategyInterface` - Strategy for element serialization
-- `SerializationStrategyRegistryInterface` - Registry for serialization strategies
-- `HeadElementFactoryRegistryInterface` - Registry for element factories
-
-### Element Types
-
-- `MetaElement` - HTML meta tags
-- `LinkElement` - HTML link tags (stylesheets, favicons, etc.)
-- `ScriptElement` - External and inline scripts
-- `StyleElement` - Inline CSS styles
+This module is not recommended for use on cached blocks, but this module provides a cache-aware architecture to handle head elements on cached blocks, and correctly render them.
 
 ### Common Methods
 
@@ -289,21 +243,6 @@ $headTagManager->createElement('custom', [
 ], 'custom_key');
 ```
 
-
-
-### Cache Strategy Implementation
-
-Implement custom cache strategies by implementing `HeadElementCacheStrategyInterface`:
-
-```php
-class CustomCacheStrategy implements HeadElementCacheStrategyInterface
-{
-    public function load(): array { /* custom loading logic */ }
-    public function save(array $elements): bool { /* custom saving logic */ }
-    public function clear(): bool { /* custom clearing logic */ }
-}
-```
-
 ### Element Serialization
 
 Custom serialization strategies allow for element-specific handling:
@@ -337,7 +276,6 @@ The module includes comprehensive test coverage:
 
 - **Unit Tests**: All core classes and interfaces
 - **Integration Tests**: End-to-end functionality
-- **Strategy Tests**: Serialization strategy validation
 - **Cache Tests**: Cache-aware functionality
 
 Run tests with:

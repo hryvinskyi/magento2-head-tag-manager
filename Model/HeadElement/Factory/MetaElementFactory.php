@@ -11,7 +11,7 @@ namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElement;
-use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElementFactory as MagentoMetaElementFactory;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Factory for creating MetaElement instances
@@ -19,7 +19,7 @@ use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElementFactory as MagentoMet
 class MetaElementFactory extends AbstractHeadElementFactory
 {
     public function __construct(
-        private readonly MagentoMetaElementFactory $magentoFactory
+        private readonly SecureHtmlRenderer $secureHtmlRenderer
     ) {
     }
 
@@ -28,7 +28,8 @@ class MetaElementFactory extends AbstractHeadElementFactory
      */
     public function create(array $data = []): HeadElementInterface
     {
-        return $this->magentoFactory->create($data);
+        $attributes = $data['attributes'] ?? [];
+        return new MetaElement($this->secureHtmlRenderer, $attributes);
     }
 
     /**

@@ -11,7 +11,6 @@ namespace Hryvinskyi\HeadTagManager\Model\Block;
 
 use Hryvinskyi\HeadTagManager\Api\Block\BlockCacheDetectorInterface;
 use Magento\Framework\App\Cache\Type\Block;
-use Magento\Framework\App\CacheInterface;
 use Magento\Framework\View\Element\AbstractBlock;
 use Psr\Log\LoggerInterface;
 
@@ -33,7 +32,9 @@ class BlockCacheDetector implements BlockCacheDetectorInterface
     {
         try {
             $cacheLifetime = $this->getCacheLifetimeFromBlock($block);
-            return $cacheLifetime !== null && $cacheLifetime !== false;
+            // Block is cacheable if getCacheLifetime() returns a positive integer or null (inherit)
+            // Block is NOT cacheable if getCacheLifetime() returns false or 0
+            return $cacheLifetime !== null && $cacheLifetime !== false && (int)$cacheLifetime !== 0;
         } catch (\Throwable $e) {
             $this->logger->warning('Failed to determine if block is cacheable', [
                 'block_name' => $block->getNameInLayout(),

@@ -11,7 +11,6 @@ namespace Hryvinskyi\HeadTagManager\Model\Cache;
 
 use Hryvinskyi\HeadTagManager\Api\Cache\BlockHeadElementCacheInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\HeadElementSerializerInterface;
-use Magento\Framework\App\CacheInterface;
 use Magento\Framework\Exception\RuntimeException;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\View\Element\AbstractBlock;
@@ -22,12 +21,10 @@ use Psr\Log\LoggerInterface;
  */
 class BlockHeadElementCache implements BlockHeadElementCacheInterface
 {
-    private const CACHE_KEY_PREFIX = 'hryvinskyi_head_elements_block_';
-    private const CACHE_TAGS = ['hryvinskyi_head_tag_manager_block'];
-    private const CACHE_LIFETIME = 3600 * 24 * 30; // 30 days
+    private const CACHE_KEY_PREFIX = 'hhe_';
 
     public function __construct(
-        private readonly CacheInterface $cache,
+        private readonly Type $cache,
         private readonly SerializerInterface $serializer,
         private readonly HeadElementSerializerInterface $elementSerializer,
         private readonly LoggerInterface $logger
@@ -43,21 +40,37 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
             return true;
         }
 
+        // Skip caching if block doesn't have cache lifetime set
+        $cacheLifetime = $this->getBlockCacheLifetime($block);
+        if ($cacheLifetime === null || $cacheLifetime === false) {
+            $this->logger->debug('Skipping head elements cache - block not cacheable', [
+                'block_name' => $block->getNameInLayout()
+            ]);
+            return true;
+        }
+
         try {
             $cacheKey = $this->generateCacheKey($block);
+            $cacheTags = $this->getBlockCacheTags($block);
             $serializedData = $this->serializer->serialize($headElements);
 
             $result = $this->cache->save(
                 $serializedData,
                 $cacheKey,
-                array_merge(self::CACHE_TAGS, $this->generateCacheTags($block)),
-                self::CACHE_LIFETIME
+                $cacheTags,
+                $cacheLifetime
             );
 
             if ($result) {
                 $this->logger->debug('Saved head elements to block cache', [
                     'block_name' => $block->getNameInLayout(),
                     'elements_count' => count($headElements),
+                    'cache_key' => $cacheKey,
+                    'cache_lifetime' => $cacheLifetime
+                ]);
+            } else {
+                $this->logger->warning('Failed to save head elements to block cache', [
+                    'block_name' => $block->getNameInLayout(),
                     'cache_key' => $cacheKey
                 ]);
             }
@@ -131,7 +144,7 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
     }
 
     /**
-     * Generate cache key for block-specific head elements
+     * Generate cache key for block-specific head elements using block's own getCacheKey
      *
      * @param AbstractBlock $block
      * @return string
@@ -139,23 +152,39 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
      */
     private function generateCacheKey(AbstractBlock $block): string
     {
-        // Use the block's own cache key to ensure proper cache invalidation
-        $blockCacheKey = $block->getCacheKey();
-        return self::CACHE_KEY_PREFIX . md5($blockCacheKey);
+        // Use the block's own cache key with our prefix
+        return self::CACHE_KEY_PREFIX . $block->getCacheKey();
     }
 
     /**
-     * Generate cache tags for block-specific head elements
+     * Get cache tags from block's own getCacheTags method
      *
      * @param AbstractBlock $block
      * @return array
      * @throws \ReflectionException
      */
-    private function generateCacheTags(AbstractBlock $block): array
+    private function getBlockCacheTags(AbstractBlock $block): array
     {
         $reflection = new \ReflectionClass($block);
         $method = $reflection->getMethod('getCacheTags');
         $method->setAccessible(true);
+
+        return $method->invoke($block);
+    }
+
+    /**
+     * Get cache lifetime from block's own getCacheLifetime method
+     *
+     * @param AbstractBlock $block
+     * @return int|bool|null
+     * @throws \ReflectionException
+     */
+    private function getBlockCacheLifetime(AbstractBlock $block)
+    {
+        $reflection = new \ReflectionClass($block);
+        $method = $reflection->getMethod('getCacheLifetime');
+        $method->setAccessible(true);
+
         return $method->invoke($block);
     }
 }

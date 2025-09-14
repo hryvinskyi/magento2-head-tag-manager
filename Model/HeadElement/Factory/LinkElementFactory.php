@@ -11,7 +11,7 @@ namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\LinkElement;
-use Hryvinskyi\HeadTagManager\Model\HeadElement\LinkElementFactory as MagentoLinkElementFactory;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Factory for creating LinkElement instances
@@ -19,7 +19,7 @@ use Hryvinskyi\HeadTagManager\Model\HeadElement\LinkElementFactory as MagentoLin
 class LinkElementFactory extends AbstractHeadElementFactory
 {
     public function __construct(
-        private readonly MagentoLinkElementFactory $magentoFactory
+        private readonly SecureHtmlRenderer $secureHtmlRenderer
     ) {
     }
 
@@ -28,7 +28,8 @@ class LinkElementFactory extends AbstractHeadElementFactory
      */
     public function create(array $data = []): HeadElementInterface
     {
-        return $this->magentoFactory->create($data);
+        $attributes = $data['attributes'] ?? [];
+        return new LinkElement($this->secureHtmlRenderer, $attributes);
     }
 
     /**

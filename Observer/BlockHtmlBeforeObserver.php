@@ -9,21 +9,18 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Observer;
 
-use Hryvinskyi\HeadTagManager\Api\Block\BlockCacheDetectorInterface;
 use Hryvinskyi\HeadTagManager\Api\Block\HeadElementTrackerInterface;
-use Hryvinskyi\HeadTagManager\Api\Cache\BlockHeadElementCacheInterface;
-use Hryvinskyi\HeadTagManager\Api\HeadTagManagerInterface;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\View\Element\AbstractBlock as MagentoAbstractBlock;
+use Magento\Store\Model\ScopeInterface;
 
 class BlockHtmlBeforeObserver implements ObserverInterface
 {
     public function __construct(
-        private readonly BlockCacheDetectorInterface $cacheDetector,
         private readonly HeadElementTrackerInterface $elementTracker,
-        private readonly BlockHeadElementCacheInterface $blockCache,
-        private readonly HeadTagManagerInterface $headTagManager
+        private readonly ScopeConfigInterface $scopeConfig
     ) {
     }
 
@@ -38,37 +35,31 @@ class BlockHtmlBeforeObserver implements ObserverInterface
     {
         $block = $observer->getEvent()->getBlock();
         // Only handle AbstractBlock instances that have layout names
-        if (!$block instanceof MagentoAbstractBlock || !$block->getNameInLayout() || !$this->cacheDetector->isBlockCacheable($block)) {
+        if (!$block instanceof MagentoAbstractBlock || !$block->getNameInLayout()) {
             return;
         }
 
-        if ($this->elementTracker->getCurrentTrackingBlock() === null) {
-            // Check if block will be served from cache
-            if ($this->cacheDetector->isBlockCached($block) === false) {
-                // Block will execute normally, start tracking
-                $this->elementTracker->startTracking($block);
-            } else {
-                // Block will load from cache, restore head elements for this block and its children
-                $this->restoreHeadElementsForBlockAndChildren($block);
-            }
+        // Skip tracking if module output is disabled (prevents tracking imbalance)
+        if ($this->isModuleOutputDisabled($block)) {
+            return;
         }
+
+        // Always start tracking for all blocks
+        // All cache handling will be done in the After observer where cache properties are final
+        $this->elementTracker->startTracking($block);
     }
 
     /**
-     * Restore head elements for a block and all its children recursively
+     * Check if module output is disabled for this block
      *
      * @param MagentoAbstractBlock $block
-     * @return void
+     * @return bool
      */
-    private function restoreHeadElementsForBlockAndChildren(MagentoAbstractBlock $block): void
+    private function isModuleOutputDisabled(MagentoAbstractBlock $block): bool
     {
-        // Restore head elements for the current block
-        $elements = $this->blockCache->loadBlockHeadElements($block);
-
-        if (count($elements) > 0) {
-            foreach ($elements as $key => $element) {
-                $this->headTagManager->addElement($element, $key);
-            }
-        }
+        return $this->scopeConfig->isSetFlag(
+            'advanced/modules_disable_output/' . $block->getModuleName(),
+            ScopeInterface::SCOPE_STORE
+        );
     }
 }

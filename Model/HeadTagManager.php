@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Model;
 
-use Hryvinskyi\HeadTagManager\Api\Cache\HeadElementCacheStrategyInterface;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Api\HeadTagManagerInterface;
 use Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface;
@@ -22,19 +21,8 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     protected array $elements = [];
 
-    /**
-     * Flag to track if elements have been loaded from cache
-     */
-    private bool $elementsLoaded = false;
-
-    /**
-     * Flag to track if elements have been modified since last cache save
-     */
-    private bool $elementsModified = false;
-
     public function __construct(
-        private readonly HeadElementFactoryRegistryInterface $factoryRegistry,
-        private readonly HeadElementCacheStrategyInterface $cacheStrategy
+        private readonly HeadElementFactoryRegistryInterface $factoryRegistry
     ) {
     }
 
@@ -46,8 +34,6 @@ class HeadTagManager implements HeadTagManagerInterface
         array $data = [],
         ?string $key = null
     ): HeadElementInterface {
-        $this->ensureElementsLoaded();
-
         $factory = $this->factoryRegistry->getFactoryByType($type);
         if (!$factory) {
             throw new \InvalidArgumentException(sprintf('No factory found for element type: %s', $type));
@@ -70,9 +56,7 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function addElement(HeadElementInterface $element, string $key): self
     {
-        $this->ensureElementsLoaded();
         $this->elements[$key] = $element;
-        $this->elementsModified = true;
         return $this;
     }
 
@@ -81,11 +65,8 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function removeElement(string $key): self
     {
-        $this->ensureElementsLoaded();
-
         if (isset($this->elements[$key])) {
             unset($this->elements[$key]);
-            $this->elementsModified = true;
         }
 
         return $this;
@@ -96,7 +77,6 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function hasElement(string $key): bool
     {
-        $this->ensureElementsLoaded();
         return isset($this->elements[$key]);
     }
 
@@ -105,7 +85,6 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function getElement(string $key): ?HeadElementInterface
     {
-        $this->ensureElementsLoaded();
         return $this->elements[$key] ?? null;
     }
 
@@ -229,9 +208,6 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function render(): string
     {
-        $this->ensureElementsLoaded();
-        $this->saveToCacheIfModified();
-
         $output = '';
         foreach ($this->elements as $element) {
             $output .= $element->render() . PHP_EOL;
@@ -245,9 +221,6 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function getRenderedElements(): array
     {
-        $this->ensureElementsLoaded();
-        $this->saveToCacheIfModified();
-
         return array_map(static function ($element) {
             return $element->render();
         }, $this->elements);
@@ -268,15 +241,11 @@ class HeadTagManager implements HeadTagManagerInterface
     }
 
     /**
-     * Clear all elements and cache
+     * Clear all elements
      */
     public function clear(): self
     {
         $this->elements = [];
-        $this->elementsLoaded = true;
-        $this->elementsModified = true;
-        $this->cacheStrategy->clear();
-
         return $this;
     }
 
@@ -287,43 +256,7 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function getAllElements(): array
     {
-        $this->ensureElementsLoaded();
         return $this->elements;
     }
 
-    /**
-     * Ensure elements are loaded from cache if needed
-     */
-    private function ensureElementsLoaded(): void
-    {
-        if (!$this->elementsLoaded) {
-            $cachedElements = $this->cacheStrategy->load();
-            if (!empty($cachedElements)) {
-                $this->elements = $cachedElements;
-            }
-            $this->elementsLoaded = true;
-        }
-    }
-
-    /**
-     * Force save to cache
-     */
-    public function saveToCache(): self
-    {
-        $this->ensureElementsLoaded();
-        $this->cacheStrategy->save($this->elements);
-        $this->elementsModified = false;
-
-        return $this;
-    }
-
-    /**
-     * Save to cache only if elements have been modified
-     */
-    private function saveToCacheIfModified(): void
-    {
-        if ($this->elementsModified) {
-            $this->saveToCache();
-        }
-    }
 }

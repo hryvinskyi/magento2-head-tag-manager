@@ -28,16 +28,6 @@
     <preference for="Hryvinskyi\HeadTagManager\Api\Cache\BlockHeadElementCacheInterface"
                 type="Hryvinskyi\HeadTagManager\Model\Cache\BlockHeadElementCache"/>
 
-    <!-- Cache Strategy Configuration -->
-    <type name="Hryvinskyi\HeadTagManager\Model\Cache\HeadElementCacheStrategy">
-        <arguments>
-            <argument name="enabled" xsi:type="boolean">true</argument>
-            <argument name="cacheLifetime" xsi:type="number">2592000</argument> <!-- 30 days -->
-            <argument name="cacheKeyPrefix" xsi:type="string">hryvinskyi_head_tag_manager_</argument>
-            <argument name="cache" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Cache\Type</argument>
-        </arguments>
-    </type>
-
     <!-- Factory Registry Configuration -->
     <type name="Hryvinskyi\HeadTagManager\Model\Registry\HeadElementFactoryRegistry">
         <arguments>
@@ -58,85 +48,6 @@
                 <item name="link" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\LinkElementSerializationStrategy</item>
                 <item name="script" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\ScriptElementSerializationStrategy</item>
                 <item name="style" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\StyleElementSerializationStrategy</item>
-            </argument>
-        </arguments>
-    </type>
-
-    <!-- Virtual Types for Different Cache Strategies -->
-
-    <!-- Disabled Cache Strategy -->
-    <virtualType name="Hryvinskyi\HeadTagManager\Model\Cache\DisabledCacheStrategy"
-                 type="Hryvinskyi\HeadTagManager\Model\Cache\NullCacheStrategy"/>
-
-    <!-- Short-lived Cache Strategy (1 hour) -->
-    <virtualType name="Hryvinskyi\HeadTagManager\Model\Cache\ShortLivedCacheStrategy"
-                 type="Hryvinskyi\HeadTagManager\Model\Cache\HeadElementCacheStrategy">
-        <arguments>
-            <argument name="enabled" xsi:type="boolean">true</argument>
-            <argument name="cacheLifetime" xsi:type="number">3600</argument> <!-- 1 hour -->
-            <argument name="cacheKeyPrefix" xsi:type="string">hryvinskyi_head_tag_manager_short_</argument>
-        </arguments>
-    </virtualType>
-
-    <!-- Long-lived Cache Strategy (1 year) -->
-    <virtualType name="Hryvinskyi\HeadTagManager\Model\Cache\LongLivedCacheStrategy"
-                 type="Hryvinskyi\HeadTagManager\Model\Cache\HeadElementCacheStrategy">
-        <arguments>
-            <argument name="enabled" xsi:type="boolean">true</argument>
-            <argument name="cacheLifetime" xsi:type="number">31536000</argument> <!-- 1 year -->
-            <argument name="cacheKeyPrefix" xsi:type="string">hryvinskyi_head_tag_manager_long_</argument>
-        </arguments>
-    </virtualType>
-
-    <!-- Different HeadTagManager instances for different use cases -->
-
-    <!-- Standard HeadTagManager with default caching -->
-    <type name="Hryvinskyi\HeadTagManager\Model\HeadTagManager">
-        <arguments>
-            <argument name="cacheStrategy" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Cache\LongLivedCacheStrategy</argument>
-        </arguments>
-    </type>
-
-    <!-- HeadTagManager without caching for development -->
-    <virtualType name="Hryvinskyi\HeadTagManager\Model\HeadTagManagerNoCaching"
-                 type="Hryvinskyi\HeadTagManager\Model\HeadTagManager">
-        <arguments>
-            <argument name="cacheStrategy" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Cache\DisabledCacheStrategy</argument>
-        </arguments>
-    </virtualType>
-
-    <!-- HeadTagManager with short-lived cache for dynamic content -->
-    <virtualType name="Hryvinskyi\HeadTagManager\Model\HeadTagManagerShortCache"
-                 type="Hryvinskyi\HeadTagManager\Model\HeadTagManager">
-        <arguments>
-            <argument name="cacheStrategy" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Cache\ShortLivedCacheStrategy</argument>
-        </arguments>
-    </virtualType>
-
-    <!-- HeadTagManager with long-lived cache for static content -->
-    <virtualType name="Hryvinskyi\HeadTagManager\Model\HeadTagManagerLongCache"
-                 type="Hryvinskyi\HeadTagManager\Model\HeadTagManager">
-        <arguments>
-            <argument name="cacheStrategy" xsi:type="object">Hryvinskyi\HeadTagManager\Model\Cache\LongLivedCacheStrategy</argument>
-        </arguments>
-    </virtualType>
-
-    <!-- Plugin for HTTP Response Head Tag Injection -->
-    <type name="Magento\Framework\App\Response\Http">
-        <plugin name="hryvinskyi_head_tag_manager_response_injection"
-                type="Hryvinskyi\HeadTagManager\Plugin\Framework\App\Response\Http"
-                sortOrder="9000"
-                disabled="false"/>
-    </type>
-
-    <!-- Plugin Configuration -->
-    <type name="Hryvinskyi\HeadTagManager\Plugin\Framework\App\Response\Http">
-        <arguments>
-            <argument name="skipClasses" xsi:type="array">
-                <!-- Skip file download responses -->
-                <item name="file_interface" xsi:type="string">Magento\Framework\App\Response\FileInterface</item>
-                <!-- Add more classes to skip if needed -->
-                <!-- <item name="redirect_interface" xsi:type="string">Magento\Framework\App\Response\RedirectInterface</item> -->
             </argument>
         </arguments>
     </type>

@@ -21,8 +21,8 @@ use Psr\Log\LoggerInterface;
  */
 class HeadElementTracker implements HeadElementTrackerInterface
 {
-    private array $elementsBefore = [];
-    private ?string $currentTrackingBlock = null;
+    private array $trackingStack = [];
+    private int $trackingLevel = 0;
 
     public function __construct(
         private readonly HeadTagManagerInterface $headTagManager,
@@ -40,13 +40,20 @@ class HeadElementTracker implements HeadElementTrackerInterface
         if (!$blockName) {
             return;
         }
-        $this->currentTrackingBlock = $blockName;
 
-        $this->elementsBefore[$blockName] = array_keys($this->headTagManager->getAllElements());
+        // Push current state onto the tracking stack
+        $this->trackingStack[] = [
+            'block_name' => $blockName,
+            'level' => $this->trackingLevel,
+            'elements_before' => array_keys($this->headTagManager->getAllElements())
+        ];
+
+        $this->trackingLevel++;
 
         $this->logger->debug('Started tracking head elements for block', [
             'block_name' => $blockName,
-            'initial_elements_count' => count($this->elementsBefore[$blockName])
+            'level' => $this->trackingLevel - 1,
+            'initial_elements_count' => count(end($this->trackingStack)['elements_before'])
         ]);
     }
 
@@ -56,12 +63,25 @@ class HeadElementTracker implements HeadElementTrackerInterface
     public function stopTrackingAndGetNewElements(AbstractBlock $block): array
     {
         $blockName = $block->getNameInLayout();
-        if (!$blockName || !isset($this->elementsBefore[$blockName])) {
+        if (!$blockName || empty($this->trackingStack)) {
+            return [];
+        }
+
+        // Find the matching tracking entry for this block
+        $trackingEntry = null;
+        for ($i = count($this->trackingStack) - 1; $i >= 0; $i--) {
+            if ($this->trackingStack[$i]['block_name'] === $blockName) {
+                $trackingEntry = $this->trackingStack[$i];
+                break;
+            }
+        }
+
+        if (!$trackingEntry) {
             return [];
         }
 
         try {
-            $previousElementKeys = $this->elementsBefore[$blockName];
+            $previousElementKeys = $trackingEntry['elements_before'];
             $currentElements = $this->headTagManager->getAllElements();
 
             $newElementsData = [];
@@ -77,6 +97,7 @@ class HeadElementTracker implements HeadElementTrackerInterface
 
             $this->logger->debug('Stopped tracking head elements for block', [
                 'block_name' => $blockName,
+                'level' => $trackingEntry['level'],
                 'new_elements_count' => count($newElementsData)
             ]);
 
@@ -95,11 +116,24 @@ class HeadElementTracker implements HeadElementTrackerInterface
      */
     public function clearTracking(AbstractBlock $block): void
     {
-        $this->currentTrackingBlock = null;
         $blockName = $block->getNameInLayout();
-        if ($blockName && isset($this->elementsBefore[$blockName])) {
-            unset($this->elementsBefore[$blockName]);
+        if (!$blockName) {
+            return;
         }
+
+        // Remove the tracking entry for this block and decrease level
+        for ($i = count($this->trackingStack) - 1; $i >= 0; $i--) {
+            if ($this->trackingStack[$i]['block_name'] === $blockName) {
+                array_splice($this->trackingStack, $i, 1);
+                $this->trackingLevel = max(0, $this->trackingLevel - 1);
+                break;
+            }
+        }
+
+        $this->logger->debug('Cleared tracking for block', [
+            'block_name' => $blockName,
+            'remaining_level' => $this->trackingLevel
+        ]);
     }
 
     /**
@@ -107,6 +141,43 @@ class HeadElementTracker implements HeadElementTrackerInterface
      */
     public function getCurrentTrackingBlock(): ?string
     {
-        return $this->currentTrackingBlock;
+        if (empty($this->trackingStack)) {
+            return null;
+        }
+
+        // Return the most recent (top-level) tracking block
+        return end($this->trackingStack)['block_name'];
+    }
+
+    /**
+     * Check if a block is currently being tracked
+     *
+     * @param AbstractBlock $block
+     * @return bool
+     */
+    public function isBlockBeingTracked(AbstractBlock $block): bool
+    {
+        $blockName = $block->getNameInLayout();
+        if (!$blockName) {
+            return false;
+        }
+
+        foreach ($this->trackingStack as $entry) {
+            if ($entry['block_name'] === $blockName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get current tracking level
+     *
+     * @return int
+     */
+    public function getTrackingLevel(): int
+    {
+        return $this->trackingLevel;
     }
 }

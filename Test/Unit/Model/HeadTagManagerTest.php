@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Test\Unit\Model;
 
-use Hryvinskyi\HeadTagManager\Api\Cache\HeadElementCacheStrategyInterface;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementFactoryInterface;
@@ -23,21 +22,14 @@ use PHPUnit\Framework\TestCase;
 class HeadTagManagerTest extends TestCase
 {
     private $factoryRegistry;
-    private $cacheStrategy;
     private $headTagManager;
 
     protected function setUp(): void
     {
         $this->factoryRegistry = $this->createMock(HeadElementFactoryRegistryInterface::class);
-        $this->cacheStrategy = $this->createMock(HeadElementCacheStrategyInterface::class);
-
-        // Setup cache strategy to return empty array for load and true for save
-        $this->cacheStrategy->method('load')->willReturn([]);
-        $this->cacheStrategy->method('save')->willReturn(true);
 
         $this->headTagManager = new HeadTagManager(
-            $this->factoryRegistry,
-            $this->cacheStrategy
+            $this->factoryRegistry
         );
     }
 
@@ -297,55 +289,53 @@ class HeadTagManagerTest extends TestCase
         $this->assertTrue($this->headTagManager->hasElement($expectedKey));
     }
 
-    public function testCenderConcatenatesAllElementRenderings()
+    public function testRenderConcatenatesAllElementRenderings()
     {
         $element1 = $this->createMock(HeadElementInterface::class);
-        $element1->expects($this->once())
-            ->method('render')
+        $element1->method('render')
             ->willReturn('<meta name="description" content="Test">');
 
         $element2 = $this->createMock(HeadElementInterface::class);
-        $element2->expects($this->once())
-            ->method('render')
+        $element2->method('render')
             ->willReturn('<link rel="stylesheet" href="styles.css">');
 
         $this->headTagManager->addElement($element1, 'meta');
         $this->headTagManager->addElement($element2, 'link');
 
+        // Test that render() actually works first
+        $result = $this->headTagManager->render();
+
         $expected = "<meta name=\"description\" content=\"Test\">" . PHP_EOL .
             "<link rel=\"stylesheet\" href=\"styles.css\">" . PHP_EOL;
-        $this->assertEquals($expected, $this->headTagManager->render());
+        $this->assertEquals($expected, $result);
     }
 
     public function testGetRenderedElementsReturnsArrayOfRenderedElements()
     {
         $element1 = $this->createMock(HeadElementInterface::class);
-        $element1->expects($this->once())
-            ->method('render')
+        $element1->method('render')
             ->willReturn('<meta name="description" content="Test">');
 
         $element2 = $this->createMock(HeadElementInterface::class);
-        $element2->expects($this->once())
-            ->method('render')
+        $element2->method('render')
             ->willReturn('<link rel="stylesheet" href="styles.css">');
 
         $this->headTagManager->addElement($element1, 'meta');
         $this->headTagManager->addElement($element2, 'link');
 
+        $result = $this->headTagManager->getRenderedElements();
+
         $expected = [
             'meta' => '<meta name="description" content="Test">',
             'link' => '<link rel="stylesheet" href="styles.css">'
         ];
-        $this->assertEquals($expected, $this->headTagManager->getRenderedElements());
+        $this->assertEquals($expected, $result);
     }
 
-    public function testClearRemovesAllElementsAndClearsCache()
+    public function testClearRemovesAllElements()
     {
         $element = $this->createMock(HeadElementInterface::class);
         $this->headTagManager->addElement($element, 'test-key');
-
-        $this->cacheStrategy->expects($this->once())
-            ->method('clear');
 
         $this->headTagManager->clear();
 
@@ -368,77 +358,9 @@ class HeadTagManagerTest extends TestCase
         $this->assertSame($element2, $allElements['key2']);
     }
 
-    public function testSaveToCacheCallsCacheStrategy()
-    {
-        $element = $this->createMock(HeadElementInterface::class);
-        $this->headTagManager->addElement($element, 'test-key');
 
-        $this->cacheStrategy->expects($this->once())
-            ->method('save')
-            ->with($this->headTagManager->getAllElements());
 
-        $this->headTagManager->saveToCache();
-    }
 
-    public function testRenderCallsSaveToCacheOnlyIfModified()
-    {
-        $element = $this->createMock(HeadElementInterface::class);
-        $element->method('render')->willReturn('<meta>');
-        $this->headTagManager->addElement($element, 'test-key');
 
-        $this->cacheStrategy->expects($this->once())
-            ->method('save');
 
-        $this->headTagManager->render();
-    }
-
-    public function testRenderDoesNotCallSaveToCacheIfNotModified()
-    {
-        // Don't add any elements, so elements are not modified
-        $this->cacheStrategy->expects($this->never())
-            ->method('save');
-
-        $this->headTagManager->render();
-    }
-
-    public function testGetRenderedElementsCallsSaveToCacheOnlyIfModified()
-    {
-        $element = $this->createMock(HeadElementInterface::class);
-        $element->method('render')->willReturn('<meta>');
-        $this->headTagManager->addElement($element, 'test-key');
-
-        $this->cacheStrategy->expects($this->once())
-            ->method('save');
-
-        $this->headTagManager->getRenderedElements();
-    }
-
-    public function testGetRenderedElementsDoesNotCallSaveToCacheIfNotModified()
-    {
-        // Don't add any elements, so elements are not modified
-        $this->cacheStrategy->expects($this->never())
-            ->method('save');
-
-        $this->headTagManager->getRenderedElements();
-    }
-
-    public function testLoadFromCacheWhenCacheReturnsElements()
-    {
-        $cachedElement = $this->createMock(HeadElementInterface::class);
-        $cachedElement->method('render')->willReturn('<cached>');
-        
-        // Create a new mock cache strategy that returns cached elements
-        $newCacheStrategy = $this->createMock(HeadElementCacheStrategyInterface::class);
-        $newCacheStrategy->method('load')->willReturn(['cached_key' => $cachedElement]);
-        $newCacheStrategy->method('save')->willReturn(true);
-        
-        // Create new instance to test cache loading
-        $headTagManager = new HeadTagManager(
-            $this->factoryRegistry,
-            $newCacheStrategy
-        );
-
-        $this->assertTrue($headTagManager->hasElement('cached_key'));
-        $this->assertSame($cachedElement, $headTagManager->getElement('cached_key'));
-    }
 }

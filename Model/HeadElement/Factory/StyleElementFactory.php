@@ -11,7 +11,7 @@ namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElement;
-use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElementFactory as MagentoStyleElementFactory;
+use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
  * Factory for creating StyleElement instances
@@ -19,7 +19,7 @@ use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElementFactory as MagentoSt
 class StyleElementFactory extends AbstractHeadElementFactory
 {
     public function __construct(
-        private readonly MagentoStyleElementFactory $magentoFactory
+        private readonly SecureHtmlRenderer $secureHtmlRenderer
     ) {
     }
 
@@ -28,7 +28,9 @@ class StyleElementFactory extends AbstractHeadElementFactory
      */
     public function create(array $data = []): HeadElementInterface
     {
-        return $this->magentoFactory->create($data);
+        $attributes = $data['attributes'] ?? [];
+        $content = $data['content'] ?? null;
+        return new StyleElement($this->secureHtmlRenderer, $attributes, $content);
     }
 
     /**

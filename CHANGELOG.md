@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-09-14
+### Removed
+- **Removing**: Page-level caching support has been removed because it consumed excessive cache space. Using block-level caching is a more efficient approach.
+
+### Updated
+- **Updated**: Unit and Integration tests to reflect the removal of page-level caching.
+- **Documentation**: Updated README and other documentation to remove references to page-level caching.
+
 ## [2.1.2] - 2025-07-30
 ### Added
 - **Refactoring**: Improved `Plugin/Framework/App/Response/Http.php` to prevent trying to render head elements in non-HTML responses
