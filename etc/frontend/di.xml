@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
+ * GitHub: https://github.com/hryvinskyi
+ */
+-->
+
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Plugin for Result Head Tag Injection - runs before page cache -->
+    <type name="Magento\Framework\Controller\ResultInterface">
+        <!-- Our plugin should executes before magento full page cache -->
+        <plugin name="result-builtin-cache" sortOrder="101" />
+        <plugin name="hryvinskyi_head_tag_manager_result_injection"
+                type="Hryvinskyi\HeadTagManager\Plugin\Framework\Controller\Result"
+                sortOrder="100"
+                disabled="false"/>
+    </type>
+
+    <!-- Plugin Configuration for Result -->
+    <type name="Hryvinskyi\HeadTagManager\Plugin\Framework\Controller\Result">
+        <arguments>
+            <argument name="skipClasses" xsi:type="array">
+                <!-- Skip file download responses -->
+                <item name="file_interface" xsi:type="string">Magento\Framework\App\Response\FileInterface</item>
+                <!-- Add more classes to skip if needed -->
+                <!-- <item name="redirect_interface" xsi:type="string">Magento\Framework\App\Response\RedirectInterface</item> -->
+            </argument>
+        </arguments>
+    </type>
+</config>
