@@ -1,6 +1,6 @@
 {
   "name": "hryvinskyi/magento2-head-tag-manager",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "HTML head tag manager for Magento 2 advanced element management capabilities",
   "type": "magento2-module",
   "require": {

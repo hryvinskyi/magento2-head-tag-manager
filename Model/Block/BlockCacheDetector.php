@@ -10,8 +10,8 @@ declare(strict_types=1);
 namespace Hryvinskyi\HeadTagManager\Model\Block;
 
 use Hryvinskyi\HeadTagManager\Api\Block\BlockCacheDetectorInterface;
-use Magento\Framework\App\Cache\Type\Block;
 use Magento\Framework\View\Element\AbstractBlock;
+use Magento\Framework\View\Element\Context;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -20,8 +20,8 @@ use Psr\Log\LoggerInterface;
 class BlockCacheDetector implements BlockCacheDetectorInterface
 {
     public function __construct(
-        private readonly Block $cache,
-        private readonly LoggerInterface $logger
+        private readonly Context $context,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -55,7 +55,7 @@ class BlockCacheDetector implements BlockCacheDetectorInterface
 
         try {
             $cacheKey = $block->getCacheKey();
-            $cachedContent = $this->cache->load($cacheKey);
+            $cachedContent = $this->context->getCache()->load($cacheKey);
             return !empty($cachedContent);
         } catch (\Throwable $e) {
             $this->logger->debug('Failed to check if block is cached', [
