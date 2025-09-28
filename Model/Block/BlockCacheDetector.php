@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace Hryvinskyi\HeadTagManager\Model\Block;
 
 use Hryvinskyi\HeadTagManager\Api\Block\BlockCacheDetectorInterface;
+use Magento\Framework\App\CacheInterface;
 use Magento\Framework\View\Element\AbstractBlock;
 use Magento\Framework\View\Element\Context;
 use Psr\Log\LoggerInterface;
@@ -55,7 +56,7 @@ class BlockCacheDetector implements BlockCacheDetectorInterface
 
         try {
             $cacheKey = $block->getCacheKey();
-            $cachedContent = $this->context->getCache()->load($cacheKey);
+            $cachedContent = $this->getCache($block)->load($cacheKey);
             return !empty($cachedContent);
         } catch (\Throwable $e) {
             $this->logger->debug('Failed to check if block is cached', [
@@ -79,5 +80,20 @@ class BlockCacheDetector implements BlockCacheDetectorInterface
         $method = $reflection->getMethod('getCacheLifetime');
         $method->setAccessible(true);
         return $method->invoke($block);
+    }
+
+    /**
+     * Get cache object from block using reflection
+     *
+     * @param AbstractBlock $block
+     * @return \Magento\Framework\App\CacheInterface
+     * @throws \ReflectionException
+     */
+    private function getCache(AbstractBlock $block): CacheInterface
+    {
+        $reflection = new \ReflectionClass($block);
+        $property = $reflection->getProperty('_cache');
+        $property->setAccessible(true);
+        return $property->getValue($block);
     }
 }
