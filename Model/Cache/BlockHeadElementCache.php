@@ -54,11 +54,14 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
             $cacheTags = $this->getBlockCacheTags($block);
             $serializedData = $this->serializer->serialize($headElements);
 
+            // Head tag manager cache should never expire on its own
+            // It should only be rewritten when the block is actually rendered
+            // This prevents cache mismatch issues where head elements expire before block cache
             $result = $this->cache->save(
                 $serializedData,
                 $cacheKey,
                 $cacheTags,
-                $cacheLifetime
+                Type::CACHE_LIFETIME // Use module's long cache lifetime (1 year)
             );
 
             if ($result) {
@@ -66,7 +69,8 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
                     'block_name' => $block->getNameInLayout(),
                     'elements_count' => count($headElements),
                     'cache_key' => $cacheKey,
-                    'cache_lifetime' => $cacheLifetime
+                    'block_cache_lifetime' => $cacheLifetime,
+                    'head_elements_cache_lifetime' => Type::CACHE_LIFETIME
                 ]);
             } else {
                 $this->logger->warning('Failed to save head elements to block cache', [

@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.2.3] - 2025-09-29
+
+### Fixed
+- **Cache Synchronization**: Fixed critical cache synchronization issue between block cache and head elements cache
+  - Head elements cache now uses module's long cache lifetime (1 year) instead of block's cache lifetime
+
+## [2.2.2] - 2025-09-28
+
+### Updated
+- **Updated** using caching type, now we always use block cache instead of default context cache
+
+### Fixed
+- **Cache Synchronization**: Fixed critical cache synchronization issue between block cache and head elements cache
+  - Head elements cache now uses module's long cache lifetime (1 year) instead of block's cache lifetime
+
 ## [2.2.1] - 2025-09-18
 
 ### Fixed
