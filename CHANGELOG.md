@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2025-09-29
+
+### Removed
+- **BREAKING**: Removed custom `head_tag_manager` cache type from `etc/cache.xml`
+  - No longer need to manage a separate cache type in Magento cache management
+  - Head elements now use each block's native cache infrastructure
+
+### Changed
+- **BREAKING**: `BlockHeadElementCache` constructor signature changed
+  - Removed dependency on cache class
+
+### Fixed
+- Cache synchronization issues where head elements could expire before or after block cache
+- Memory and storage efficiency by removing duplicate cache layer
+- Cache invalidation now properly follows block cache invalidation
+
+### Updated
+- Unit tests updated to reflect new constructor and caching behavior
+
 ## [2.2.3] - 2025-09-29
 
 ### Fixed

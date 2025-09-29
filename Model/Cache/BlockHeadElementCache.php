@@ -22,9 +22,10 @@ use Psr\Log\LoggerInterface;
 class BlockHeadElementCache implements BlockHeadElementCacheInterface
 {
     private const CACHE_KEY_PREFIX = 'hhe_';
+    private const CACHE_TAG = 'HEAD_ELEMENT_BLOCK';
+    private const DEFAULT_CACHE_LIFETIME = 86400; // 1 day
 
     public function __construct(
-        private readonly Type $cache,
         private readonly SerializerInterface $serializer,
         private readonly HeadElementSerializerInterface $elementSerializer,
         private readonly LoggerInterface $logger
@@ -50,18 +51,31 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
         }
 
         try {
+            // Get block's own cache instance
+            $blockCache = $this->getBlockCache($block);
+            if (!$blockCache) {
+                $this->logger->debug('Block cache not available, skipping head elements cache', [
+                    'block_name' => $block->getNameInLayout()
+                ]);
+                return true;
+            }
+
             $cacheKey = $this->generateCacheKey($block);
             $cacheTags = $this->getBlockCacheTags($block);
             $serializedData = $this->serializer->serialize($headElements);
 
-            // Head tag manager cache should never expire on its own
-            // It should only be rewritten when the block is actually rendered
-            // This prevents cache mismatch issues where head elements expire before block cache
-            $result = $this->cache->save(
+            // Use block's cache lifetime to ensure head elements cache expires with the block cache
+            // This prevents cache mismatch issues
+            $effectiveLifetime = is_numeric($cacheLifetime) ? (int)$cacheLifetime : self::DEFAULT_CACHE_LIFETIME;
+
+            // Add our cache tag to block's tags
+            $allCacheTags = array_merge($cacheTags, [self::CACHE_TAG]);
+
+            $result = $blockCache->save(
                 $serializedData,
                 $cacheKey,
-                $cacheTags,
-                Type::CACHE_LIFETIME // Use module's long cache lifetime (1 year)
+                $allCacheTags,
+                $effectiveLifetime
             );
 
             if ($result) {
@@ -70,7 +84,7 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
                     'elements_count' => count($headElements),
                     'cache_key' => $cacheKey,
                     'block_cache_lifetime' => $cacheLifetime,
-                    'head_elements_cache_lifetime' => Type::CACHE_LIFETIME
+                    'head_elements_cache_lifetime' => $effectiveLifetime
                 ]);
             } else {
                 $this->logger->warning('Failed to save head elements to block cache', [
@@ -95,8 +109,14 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
     public function loadBlockHeadElements(AbstractBlock $block): array
     {
         try {
+            // Get block's own cache instance
+            $blockCache = $this->getBlockCache($block);
+            if (!$blockCache) {
+                return [];
+            }
+
             $cacheKey = $this->generateCacheKey($block);
-            $cachedData = $this->cache->load($cacheKey);
+            $cachedData = $blockCache->load($cacheKey);
 
             if ($cachedData) {
                 $headElementsData = $this->serializer->unserialize($cachedData);
@@ -127,8 +147,14 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
     public function clearBlockHeadElements(AbstractBlock $block): bool
     {
         try {
+            // Get block's own cache instance
+            $blockCache = $this->getBlockCache($block);
+            if (!$blockCache) {
+                return true; // Consider success if no cache available
+            }
+
             $cacheKey = $this->generateCacheKey($block);
-            $result = $this->cache->remove($cacheKey);
+            $result = $blockCache->remove($cacheKey);
 
             if ($result) {
                 $this->logger->debug('Cleared head elements cache for block', [
@@ -190,5 +216,21 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
         $method->setAccessible(true);
 
         return $method->invoke($block);
+    }
+
+    /**
+     * Get block's own cache frontend instance from _cache property
+     *
+     * @param AbstractBlock $block
+     * @return \Magento\Framework\Cache\FrontendInterface|null
+     * @throws \ReflectionException
+     */
+    private function getBlockCache(AbstractBlock $block): ?\Magento\Framework\Cache\FrontendInterface
+    {
+        $reflection = new \ReflectionClass($block);
+        $property = $reflection->getProperty('_cache');
+        $property->setAccessible(true);
+
+        return $property->getValue($block);
     }
 }

@@ -12,7 +12,7 @@ namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\Cache;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\HeadElementSerializerInterface;
 use Hryvinskyi\HeadTagManager\Model\Cache\BlockHeadElementCache;
-use Hryvinskyi\HeadTagManager\Model\Cache\Type;
+use Magento\Framework\Cache\FrontendInterface;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\View\Element\AbstractBlock;
 use PHPUnit\Framework\TestCase;
@@ -20,7 +20,7 @@ use Psr\Log\LoggerInterface;
 
 class BlockHeadElementCacheTest extends TestCase
 {
-    private $cache;
+    private $blockCache;
     private $serializer;
     private $elementSerializer;
     private $logger;
@@ -29,7 +29,7 @@ class BlockHeadElementCacheTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->cache = $this->createMock(Type::class);
+        $this->blockCache = $this->createMock(FrontendInterface::class);
         $this->serializer = $this->createMock(SerializerInterface::class);
         $this->elementSerializer = $this->createMock(HeadElementSerializerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
@@ -39,7 +39,6 @@ class BlockHeadElementCacheTest extends TestCase
         $this->block->method('getCacheKey')->willReturn('test_block_cache_key');
 
         $this->blockHeadElementCache = new BlockHeadElementCache(
-            $this->cache,
             $this->serializer,
             $this->elementSerializer,
             $this->logger
@@ -66,7 +65,13 @@ class BlockHeadElementCacheTest extends TestCase
         $element1 = $this->createMock(HeadElementInterface::class);
         $expectedElements = ['key1' => $element1];
 
-        $this->cache->expects($this->once())
+        // Mock the block's _cache property
+        $reflection = new \ReflectionClass($this->block);
+        $property = $reflection->getProperty('_cache');
+        $property->setAccessible(true);
+        $property->setValue($this->block, $this->blockCache);
+
+        $this->blockCache->expects($this->once())
             ->method('load')
             ->with('hhe_test_block_cache_key')
             ->willReturn('cached_data');
@@ -88,7 +93,13 @@ class BlockHeadElementCacheTest extends TestCase
 
     public function testLoadBlockHeadElementsReturnsEmptyForNoCache()
     {
-        $this->cache->expects($this->once())
+        // Mock the block's _cache property
+        $reflection = new \ReflectionClass($this->block);
+        $property = $reflection->getProperty('_cache');
+        $property->setAccessible(true);
+        $property->setValue($this->block, $this->blockCache);
+
+        $this->blockCache->expects($this->once())
             ->method('load')
             ->with('hhe_test_block_cache_key')
             ->willReturn(false);
@@ -100,7 +111,13 @@ class BlockHeadElementCacheTest extends TestCase
 
     public function testLoadBlockHeadElementsHandlesException()
     {
-        $this->cache->expects($this->once())
+        // Mock the block's _cache property
+        $reflection = new \ReflectionClass($this->block);
+        $property = $reflection->getProperty('_cache');
+        $property->setAccessible(true);
+        $property->setValue($this->block, $this->blockCache);
+
+        $this->blockCache->expects($this->once())
             ->method('load')
             ->willThrowException(new \Exception('Cache load failed'));
 
@@ -120,7 +137,13 @@ class BlockHeadElementCacheTest extends TestCase
 
     public function testClearBlockHeadElementsSuccessfully()
     {
-        $this->cache->expects($this->once())
+        // Mock the block's _cache property
+        $reflection = new \ReflectionClass($this->block);
+        $property = $reflection->getProperty('_cache');
+        $property->setAccessible(true);
+        $property->setValue($this->block, $this->blockCache);
+
+        $this->blockCache->expects($this->once())
             ->method('remove')
             ->with('hhe_test_block_cache_key')
             ->willReturn(true);
@@ -132,7 +155,13 @@ class BlockHeadElementCacheTest extends TestCase
 
     public function testClearBlockHeadElementsHandlesException()
     {
-        $this->cache->expects($this->once())
+        // Mock the block's _cache property
+        $reflection = new \ReflectionClass($this->block);
+        $property = $reflection->getProperty('_cache');
+        $property->setAccessible(true);
+        $property->setValue($this->block, $this->blockCache);
+
+        $this->blockCache->expects($this->once())
             ->method('remove')
             ->willThrowException(new \Exception('Cache remove failed'));
 

@@ -2,13 +2,10 @@
 <!--
   ~ Copyright (c) 2022. MageCloud.  All rights reserved.
   ~ @author: Volodymyr Hryvinskyi <mailto:volodymyr@hryvinskyi.com>
+  ~ Note: Custom cache type removed - now uses Magento's default block cache
   -->
 
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Cache/etc/cache.xsd">
-    <type name="head_tag_manager" translate="label,description"
-          instance="Hryvinskyi\HeadTagManager\Model\Cache\Type">
-        <label>Head Tag Manager (script, style, link, etc...)</label>
-        <description>Head Tag Manager Cache (script, style, link, meta tags, etc...). This cache type is used to store head elements for faster retrieval. It should be enabled to properly manage head tags across the site.</description>
-    </type>
+    <!-- Custom head_tag_manager cache type removed - now uses built-in block cache -->
 </config>
