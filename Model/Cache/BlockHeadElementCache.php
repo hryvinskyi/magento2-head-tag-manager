@@ -11,6 +11,8 @@ namespace Hryvinskyi\HeadTagManager\Model\Cache;
 
 use Hryvinskyi\HeadTagManager\Api\Cache\BlockHeadElementCacheInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\HeadElementSerializerInterface;
+use Magento\Framework\App\CacheInterface;
+use Magento\Framework\Cache\FrontendInterface;
 use Magento\Framework\Exception\RuntimeException;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\View\Element\AbstractBlock;
@@ -222,10 +224,10 @@ class BlockHeadElementCache implements BlockHeadElementCacheInterface
      * Get block's own cache frontend instance from _cache property
      *
      * @param AbstractBlock $block
-     * @return \Magento\Framework\Cache\FrontendInterface|null
+     * @return null|FrontendInterface|CacheInterface
      * @throws \ReflectionException
      */
-    private function getBlockCache(AbstractBlock $block): ?\Magento\Framework\Cache\FrontendInterface
+    private function getBlockCache(AbstractBlock $block): null|FrontendInterface|CacheInterface
     {
         $reflection = new \ReflectionClass($block);
         $property = $reflection->getProperty('_cache');
