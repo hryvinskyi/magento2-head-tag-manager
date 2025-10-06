@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Model\HeadElement;
 
+use Hryvinskyi\Base\Helper\Html;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
@@ -105,10 +106,6 @@ abstract class AbstractHeadElement implements HeadElementInterface
      */
     protected function attributesToString(): string
     {
-        $result = '';
-        foreach ($this->attributes as $name => $value) {
-            $result .= ' ' . htmlspecialchars($name) . '="' . htmlspecialchars($value) . '"';
-        }
-        return $result;
+        return Html::renderTagAttributes($this->attributes);
     }
 }
