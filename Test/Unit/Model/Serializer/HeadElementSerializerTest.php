@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -66,10 +66,11 @@ class HeadElementSerializerTest extends TestCase
 
     public function testSerializeWithoutStrategy(): void
     {
-        // Create a test element that implements getAttributes
+        // Create a test element that implements getAttributes and getSortOrder
         $element = new class implements HeadElementInterface {
             public function render(): string { return '<test>'; }
             public function getAttributes(): array { return ['name' => 'test']; }
+            public function getSortOrder(): int { return 100; }
         };
 
         $this->strategyRegistry->expects($this->once())
@@ -89,6 +90,7 @@ class HeadElementSerializerTest extends TestCase
                 'type' => get_class($element),
                 'short_type' => 'unknown',
                 'attributes' => ['name' => 'test'],
+                'sort_order' => 100,
                 'content' => null
             ]
         ];
@@ -126,7 +128,8 @@ class HeadElementSerializerTest extends TestCase
         $elementData = [
             'type' => 'TestElement',
             'attributes' => ['name' => 'test'],
-            'content' => 'test content'
+            'content' => 'test content',
+            'sort_order' => 50
         ];
 
         $factory = $this->createMock(\Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementFactoryInterface::class);
@@ -139,7 +142,7 @@ class HeadElementSerializerTest extends TestCase
 
         $factory->expects($this->once())
             ->method('create')
-            ->with(['attributes' => ['name' => 'test'], 'content' => 'test content'])
+            ->with(['attributes' => ['name' => 'test'], 'content' => 'test content', 'sort_order' => 50])
             ->willReturn($element);
 
         $result = $this->serializer->unserialize(['key1' => $elementData]);
@@ -169,7 +172,7 @@ class HeadElementSerializerTest extends TestCase
 
         $factory->expects($this->once())
             ->method('create')
-            ->with(['attributes' => ['name' => 'test']])
+            ->with(['attributes' => ['name' => 'test'], 'sort_order' => 100])
             ->willReturn($element);
 
         $result = $this->serializer->unserialize(['key1' => $elementData]);

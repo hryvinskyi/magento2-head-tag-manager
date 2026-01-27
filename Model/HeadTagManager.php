@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -158,6 +158,18 @@ class HeadTagManager implements HeadTagManagerInterface
     /**
      * @inheritDoc
      */
+    public function addInlineStyle(string $content, array $attributes = [], ?string $key = null): self
+    {
+        $data = ['attributes' => $attributes, 'content' => $content];
+        $styleKey = $key ?? $this->generateElementKey('style', $data);
+        $this->createElement('style', $data, $styleKey);
+
+        return $this;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function addScript(array $attributes, ?string $content = null, ?string $key = null): self
     {
         $data = ['attributes' => $attributes, 'content' => $content];
@@ -184,23 +196,7 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function addInlineScript(string $content, array $attributes = [], ?string $key = null): self
     {
-        $data = ['attributes' => $attributes, 'content' => $content];
-        $scriptKey = $key ?? $this->generateElementKey('script', $data);
-        $this->createElement('script', $data, $scriptKey);
-
-        return $this;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function addInlineStyle(string $content, array $attributes = [], ?string $key = null): self
-    {
-        $data = ['attributes' => $attributes, 'content' => $content];
-        $styleKey = $key ?? $this->generateElementKey('style', $data);
-        $this->createElement('style', $data, $styleKey);
-
-        return $this;
+        return $this->addScript($attributes, $content, $key);
     }
 
     /**
@@ -208,8 +204,15 @@ class HeadTagManager implements HeadTagManagerInterface
      */
     public function render(): string
     {
+        $elements = $this->elements;
+
+        // Stable sort by sortOrder (preserves insertion order for equal values)
+        uasort($elements, static function (HeadElementInterface $a, HeadElementInterface $b): int {
+            return $a->getSortOrder() <=> $b->getSortOrder();
+        });
+
         $output = '';
-        foreach ($this->elements as $element) {
+        foreach ($elements as $element) {
             $output .= $element->render() . PHP_EOL;
         }
 
@@ -258,5 +261,4 @@ class HeadTagManager implements HeadTagManagerInterface
     {
         return $this->elements;
     }
-
 }

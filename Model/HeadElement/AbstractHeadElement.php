@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -20,8 +20,31 @@ abstract class AbstractHeadElement implements HeadElementInterface
 {
     public function __construct(
         private readonly SecureHtmlRenderer $secureHtmlRenderer,
-        protected array $attributes = []
+        protected array $attributes = [],
+        protected int $sortOrder = 100
     ) {
+    }
+
+    /**
+     * Get the sort order for rendering
+     *
+     * @return int The sort order value (lower values render first)
+     */
+    public function getSortOrder(): int
+    {
+        return $this->sortOrder;
+    }
+
+    /**
+     * Set the sort order for rendering
+     *
+     * @param int $sortOrder The sort order value
+     * @return $this
+     */
+    public function setSortOrder(int $sortOrder): self
+    {
+        $this->sortOrder = $sortOrder;
+        return $this;
     }
 
     /**

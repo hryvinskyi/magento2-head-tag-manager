@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -30,7 +30,8 @@ class StyleElementFactory extends AbstractHeadElementFactory
     {
         $attributes = $data['attributes'] ?? [];
         $content = $data['content'] ?? null;
-        return new StyleElement($this->secureHtmlRenderer, $attributes, $content);
+        $sortOrder = $data['sort_order'] ?? 10;
+        return new StyleElement($this->secureHtmlRenderer, $attributes, $content, $sortOrder);
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -97,7 +97,7 @@ class HeadElementSerializer implements HeadElementSerializerInterface
 
         // Try to get factory by full class name first
         $factory = $this->factoryRegistry->getFactoryByClassName($type);
-        
+
         // If not found, try to get by element type (short name)
         if (!$factory) {
             $factory = $this->factoryRegistry->getFactoryByType($type);
@@ -109,11 +109,14 @@ class HeadElementSerializer implements HeadElementSerializerInterface
 
         // Prepare data for factory creation
         $factoryData = ['attributes' => $attributes];
-        
+
         // Add content for elements that support it (script and style)
         if ($content !== null) {
             $factoryData['content'] = $content;
         }
+
+        // Add sort_order for proper element ordering
+        $factoryData['sort_order'] = $elementData['sort_order'] ?? 100;
 
         return $factory->create($factoryData);
     }
@@ -125,11 +128,12 @@ class HeadElementSerializer implements HeadElementSerializerInterface
     {
         $className = get_class($element);
         $elementType = $this->factoryRegistry->getElementTypeByClassName($className);
-        
+
         return [
             'type' => $className,
             'short_type' => $elementType ?? 'unknown',
             'attributes' => $element->getAttributes(),
+            'sort_order' => $element->getSortOrder(),
             'content' => null
         ];
     }

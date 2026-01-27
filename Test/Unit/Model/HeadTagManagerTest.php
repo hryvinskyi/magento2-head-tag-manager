@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -289,15 +289,20 @@ class HeadTagManagerTest extends TestCase
         $this->assertTrue($this->headTagManager->hasElement($expectedKey));
     }
 
+    /** @noinspection HtmlUnknownTarget */
     public function testRenderConcatenatesAllElementRenderings()
     {
         $element1 = $this->createMock(HeadElementInterface::class);
         $element1->method('render')
             ->willReturn('<meta name="description" content="Test">');
+        $element1->method('getSortOrder')
+            ->willReturn(100);
 
         $element2 = $this->createMock(HeadElementInterface::class);
         $element2->method('render')
             ->willReturn('<link rel="stylesheet" href="styles.css">');
+        $element2->method('getSortOrder')
+            ->willReturn(100);
 
         $this->headTagManager->addElement($element1, 'meta');
         $this->headTagManager->addElement($element2, 'link');
@@ -310,6 +315,77 @@ class HeadTagManagerTest extends TestCase
         $this->assertEquals($expected, $result);
     }
 
+    /** @noinspection HtmlUnknownTarget */
+    public function testRenderSortsElementsBySortOrder()
+    {
+        $element1 = $this->createMock(HeadElementInterface::class);
+        $element1->method('render')
+            ->willReturn('<script src="deferred.js"></script>');
+        $element1->method('getSortOrder')
+            ->willReturn(200);
+
+        $element2 = $this->createMock(HeadElementInterface::class);
+        $element2->method('render')
+            ->willReturn('<script src="critical.js"></script>');
+        $element2->method('getSortOrder')
+            ->willReturn(1);
+
+        $element3 = $this->createMock(HeadElementInterface::class);
+        $element3->method('render')
+            ->willReturn('<link rel="stylesheet" href="styles.css">');
+        $element3->method('getSortOrder')
+            ->willReturn(100);
+
+        // Add elements in non-sorted order
+        $this->headTagManager->addElement($element1, 'deferred');
+        $this->headTagManager->addElement($element2, 'critical');
+        $this->headTagManager->addElement($element3, 'styles');
+
+        $result = $this->headTagManager->render();
+
+        // Elements should be sorted by sortOrder (ascending)
+        $expected = '<script src="critical.js"></script>' . PHP_EOL .
+            '<link rel="stylesheet" href="styles.css">' . PHP_EOL .
+            '<script src="deferred.js"></script>' . PHP_EOL;
+
+        $this->assertEquals($expected, $result);
+    }
+
+    public function testRenderPreservesInsertionOrderForEqualSortOrder()
+    {
+        $element1 = $this->createMock(HeadElementInterface::class);
+        $element1->method('render')
+            ->willReturn('<meta name="first">');
+        $element1->method('getSortOrder')
+            ->willReturn(100);
+
+        $element2 = $this->createMock(HeadElementInterface::class);
+        $element2->method('render')
+            ->willReturn('<meta name="second">');
+        $element2->method('getSortOrder')
+            ->willReturn(100);
+
+        $element3 = $this->createMock(HeadElementInterface::class);
+        $element3->method('render')
+            ->willReturn('<meta name="third">');
+        $element3->method('getSortOrder')
+            ->willReturn(100);
+
+        $this->headTagManager->addElement($element1, 'first');
+        $this->headTagManager->addElement($element2, 'second');
+        $this->headTagManager->addElement($element3, 'third');
+
+        $result = $this->headTagManager->render();
+
+        // Elements with same sort order should maintain insertion order
+        $expected = '<meta name="first">' . PHP_EOL .
+            '<meta name="second">' . PHP_EOL .
+            '<meta name="third">' . PHP_EOL;
+
+        $this->assertEquals($expected, $result);
+    }
+
+    /** @noinspection HtmlUnknownTarget */
     public function testGetRenderedElementsReturnsArrayOfRenderedElements()
     {
         $element1 = $this->createMock(HeadElementInterface::class);

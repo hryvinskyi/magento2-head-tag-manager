@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -17,11 +17,12 @@ use Magento\Framework\View\Helper\SecureHtmlRenderer;
 class StyleElement extends AbstractHeadElement
 {
     public function __construct(
-        private readonly SecureHtmlRenderer $secureHtmlRenderer,
+        SecureHtmlRenderer $secureHtmlRenderer,
         protected array $attributes = [],
-        private string|null $content = null
+        private string|null $content = null,
+        int $sortOrder = 100
     ) {
-        parent::__construct($secureHtmlRenderer, $attributes);
+        parent::__construct($secureHtmlRenderer, $attributes, $sortOrder);
     }
 
     /**

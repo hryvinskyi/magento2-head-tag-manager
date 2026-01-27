@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -83,5 +83,31 @@ class AbstractHeadElementTest extends TestCase
     public function testCanGetSecureHtmlRenderer()
     {
         $this->assertSame($this->secureHtmlRenderer, $this->abstractHeadElement->getSecureHtmlRenderer());
+    }
+
+    public function testDefaultSortOrderIs100()
+    {
+        $this->assertEquals(100, $this->abstractHeadElement->getSortOrder());
+    }
+
+    public function testCanSetAndGetSortOrder()
+    {
+        $this->abstractHeadElement->setSortOrder(50);
+        $this->assertEquals(50, $this->abstractHeadElement->getSortOrder());
+    }
+
+    public function testSetSortOrderReturnsSelf()
+    {
+        $result = $this->abstractHeadElement->setSortOrder(25);
+        $this->assertSame($this->abstractHeadElement, $result);
+    }
+
+    public function testConstructorAcceptsSortOrder()
+    {
+        $element = $this->getMockForAbstractClass(
+            AbstractHeadElement::class,
+            [$this->secureHtmlRenderer, [], 42]
+        );
+        $this->assertEquals(42, $element->getSortOrder());
     }
 }

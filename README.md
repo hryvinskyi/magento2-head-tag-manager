@@ -108,6 +108,36 @@ This module is not recommended for use on cached blocks, but this module provide
 - `addExternalScript(string $src, array $attributes = [], ?string $key = null)` - Add external script
 - `addInlineScript(string $content, array $attributes = [], ?string $key = null)` - Add inline script
 
+### Element Sort Order
+
+You can control the rendering order of head elements using the `sort_order` parameter.
+Elements are sorted in ascending order (lower values render first). The default sort order is 100 for all elements.
+
+```php
+// Critical scripts should load first (sort_order = 1)
+$headManager->createElement('script', [
+    'attributes' => ['src' => 'critical.js'],
+    'sort_order' => 1
+]);
+
+// Viewport meta tag with high priority (sort_order = 5)
+$headManager->createElement('meta', [
+    'attributes' => ['name' => 'viewport', 'content' => 'width=device-width, initial-scale=1'],
+    'sort_order' => 5
+]);
+
+// Regular stylesheet uses default sort_order (100)
+$headManager->addStylesheet('styles.css');
+
+// Deferred scripts load later (sort_order = 200)
+$headManager->createElement('script', [
+    'attributes' => ['src' => 'analytics.js', 'defer' => true],
+    'sort_order' => 200
+]);
+```
+
+Elements with the same sort order maintain their insertion order (stable sort).
+
 ## Advanced Usage
 
 ### Custom Elements
@@ -124,13 +154,15 @@ To add support for a new head element type:
 ```php
 class CustomElement implements HeadElementInterface
 {
-    private $attributes;
-    private $content;
+    private array $attributes;
+    private string $content;
+    private int $sortOrder;
 
-    public function __construct(array $attributes, string $content)
+    public function __construct(array $attributes, string $content, int $sortOrder = 100)
     {
         $this->attributes = $attributes;
         $this->content = $content;
+        $this->sortOrder = $sortOrder;
     }
 
     public function getAttributes(): array
@@ -142,11 +174,12 @@ class CustomElement implements HeadElementInterface
     {
         return $this->content;
     }
-    
-    /**
-     * Render the head element as HTML
-     * @return string The HTML representation of the element
-     */
+
+    public function getSortOrder(): int
+    {
+        return $this->sortOrder;
+    }
+
     public function render(): string
     {
         $attributes = '';
@@ -161,7 +194,7 @@ class CustomElement implements HeadElementInterface
 ### Custom Factory
 
 ```php
-class CustomElementFactory extends extends AbstractHeadElementFactory
+class CustomElementFactory extends AbstractHeadElementFactory
 {
     /**
      * @inheritDoc
@@ -170,7 +203,8 @@ class CustomElementFactory extends extends AbstractHeadElementFactory
     {
         return new CustomElement(
             $data['attributes'] ?? [],
-            $data['content'] ?? ''
+            $data['content'] ?? '',
+            $data['sort_order'] ?? 100
         );
     }
 
@@ -200,8 +234,9 @@ class CustomElementSerializationStrategy implements HeadElementSerializationStra
     {
         return [
             'type' => get_class($element),
-            'short_type' => $element->getElementType(),
+            'short_type' => $this->getElementType(),
             'attributes' => $element->getAttributes(),
+            'sort_order' => $element->getSortOrder(),
             'content' => $element->getContent()
         ];
     }
@@ -256,6 +291,7 @@ class CustomElementStrategy implements HeadElementSerializationStrategyInterface
             'type' => get_class($element),
             'short_type' => $this->getElementType(),
             'attributes' => $element->getAttributes(),
+            'sort_order' => $element->getSortOrder(),
             'content' => $this->extractContent($element)
         ];
     }

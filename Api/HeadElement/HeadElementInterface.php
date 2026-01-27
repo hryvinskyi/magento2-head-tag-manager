@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -16,7 +16,15 @@ interface HeadElementInterface
 {
     /**
      * Render the head element as HTML
+     *
      * @return string The HTML representation of the element
      */
     public function render(): string;
+
+    /**
+     * Get the sort order for rendering
+     *
+     * @return int The sort order value (lower values render first)
+     */
+    public function getSortOrder(): int;
 }

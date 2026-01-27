@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -40,6 +40,7 @@ abstract class AbstractSerializationStrategy implements HeadElementSerialization
             'type' => get_class($element),
             'short_type' => $this->getElementType(),
             'attributes' => $element->getAttributes(),
+            'sort_order' => $element->getSortOrder(),
         ];
 
         // Add additional data specific to this element type

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -29,7 +29,8 @@ class LinkElementFactory extends AbstractHeadElementFactory
     public function create(array $data = []): HeadElementInterface
     {
         $attributes = $data['attributes'] ?? [];
-        return new LinkElement($this->secureHtmlRenderer, $attributes);
+        $sortOrder = $data['sort_order'] ?? 100;
+        return new LinkElement($this->secureHtmlRenderer, $attributes, $sortOrder);
     }
 
     /**

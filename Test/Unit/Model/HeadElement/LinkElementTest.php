@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -31,8 +31,9 @@ class LinkElementTest extends TestCase
             'href' => 'styles.css'
         ]);
 
+        /** @noinspection HtmlUnknownTarget */
         $this->assertEquals(
-            '<link rel="stylesheet" href="styles.css">',
+            '<link href="styles.css" rel="stylesheet">',
             $this->linkElement->render()
         );
     }

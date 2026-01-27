@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2025-01-27
+
+### Added
+- **Sort Order Support**: Added `sortOrder` property to head elements for explicit control over tag rendering order
+  - New `getSortOrder(): int` method in `HeadElementInterface`
+  - New `getSortOrder()` and `setSortOrder()` methods in `AbstractHeadElement`
+  - Elements are sorted in ascending order (lower values render first)
+  - Default sort order is 100 for all element types
+  - Stable sort preserves insertion order for elements with equal sort order
+
+### Changed
+- Updated all element constructors to accept optional `$sortOrder` parameter
+- Updated all element factories to extract `sort_order` from `$data` array
+- Updated `HeadTagManager::render()` to sort elements before rendering
+- Updated serialization to include `sort_order` in cached data
+
 ## [2.3.3] - 2025-10-08
 
 ### Updated

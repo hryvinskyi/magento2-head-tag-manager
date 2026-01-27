@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -108,6 +108,7 @@ class HeadTagManagerIntegrationTest extends TestCase
         $this->assertEquals(MetaElement::class, $metaData['type']);
         $this->assertEquals('meta', $metaData['short_type']);
         $this->assertEquals(['name' => 'description', 'content' => 'Test'], $metaData['attributes']);
+        $this->assertEquals(100, $metaData['sort_order']);
 
         // Verify script element serialization
         $scriptData = $serializedData['inline_script'];
@@ -115,6 +116,7 @@ class HeadTagManagerIntegrationTest extends TestCase
         $this->assertEquals('script', $scriptData['short_type']);
         $this->assertEquals(['type' => 'text/javascript'], $scriptData['attributes']);
         $this->assertEquals('console.log("test");', $scriptData['content']);
+        $this->assertEquals(100, $scriptData['sort_order']);
 
         // Deserialize elements
         $deserializedElements = $this->serializer->unserialize($serializedData);
@@ -130,11 +132,13 @@ class HeadTagManagerIntegrationTest extends TestCase
         // Verify meta element reconstruction
         $this->assertInstanceOf(MetaElement::class, $deserializedMeta);
         $this->assertEquals(['name' => 'description', 'content' => 'Test'], $deserializedMeta->getAttributes());
+        $this->assertEquals(100, $deserializedMeta->getSortOrder());
 
         // Verify script element reconstruction
         $this->assertInstanceOf(ScriptElement::class, $deserializedScript);
         $this->assertEquals(['type' => 'text/javascript'], $deserializedScript->getAttributes());
         $this->assertEquals('console.log("test");', $deserializedScript->getContent());
+        $this->assertEquals(100, $deserializedScript->getSortOrder());
     }
 
     public function testStrategyRegistryIntegration(): void
@@ -148,11 +152,12 @@ class HeadTagManagerIntegrationTest extends TestCase
 
         // Verify strategy can serialize element
         $serializedData = $strategy->serialize($metaElement, 'test-key');
-        
+
         $expected = [
             'type' => MetaElement::class,
             'short_type' => 'meta',
-            'attributes' => ['name' => 'keywords', 'content' => 'test']
+            'attributes' => ['name' => 'keywords', 'content' => 'test'],
+            'sort_order' => 100
         ];
 
         $this->assertEquals($expected, $serializedData);
@@ -219,10 +224,11 @@ class HeadTagManagerIntegrationTest extends TestCase
         // Should fall back to basic serialization
         $this->assertArrayHasKey('unknown', $serializedData);
         $unknownData = $serializedData['unknown'];
-        
+
         $this->assertEquals(get_class($unknownElement), $unknownData['type']);
         $this->assertEquals('unknown', $unknownData['short_type']);
         $this->assertEquals(['custom' => 'attribute'], $unknownData['attributes']);
+        $this->assertEquals(100, $unknownData['sort_order']);
         $this->assertNull($unknownData['content']);
     }
 

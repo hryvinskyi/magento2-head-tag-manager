@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -46,6 +46,7 @@ class ScriptElementSerializationStrategyTest extends TestCase
         $element = $this->createMock(ScriptElement::class);
         $element->method('getAttributes')->willReturn(['src' => 'test.js']);
         $element->method('getContent')->willReturn('console.log("test");');
+        $element->method('getSortOrder')->willReturn(100);
 
         $result = $this->strategy->serialize($element, 'test-key');
 
@@ -53,6 +54,7 @@ class ScriptElementSerializationStrategyTest extends TestCase
             'type' => get_class($element),
             'short_type' => 'script',
             'attributes' => ['src' => 'test.js'],
+            'sort_order' => 100,
             'content' => 'console.log("test");'
         ];
 
@@ -64,6 +66,7 @@ class ScriptElementSerializationStrategyTest extends TestCase
         $element = $this->createMock(ScriptElement::class);
         $element->method('getAttributes')->willReturn(['src' => 'test.js']);
         $element->method('getContent')->willReturn(null);
+        $element->method('getSortOrder')->willReturn(100);
 
         $result = $this->strategy->serialize($element, 'test-key');
 
@@ -71,6 +74,7 @@ class ScriptElementSerializationStrategyTest extends TestCase
             'type' => get_class($element),
             'short_type' => 'script',
             'attributes' => ['src' => 'test.js'],
+            'sort_order' => 100,
             'content' => null
         ];
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -144,6 +144,11 @@ class Result
         }
 
         $headContent = $this->headTagManager->render();
+
+        if (empty($headContent)) {
+            $this->logger->debug('No head tags to inject');
+            return;
+        }
 
         $updatedContent = str_replace(self::HEAD_PLACEHOLDER, $headContent, $content);
         $response->setContent($updatedContent);

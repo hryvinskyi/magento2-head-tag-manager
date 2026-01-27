@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -47,7 +47,8 @@ class AbstractSerializationStrategyTest extends TestCase
         $expected = [
             'type' => TestElement::class,
             'short_type' => 'test',
-            'attributes' => ['name' => 'test', 'content' => 'value']
+            'attributes' => ['name' => 'test', 'content' => 'value'],
+            'sort_order' => 100
         ];
 
         $this->assertEquals($expected, $result);
@@ -65,6 +66,7 @@ class AbstractSerializationStrategyTest extends TestCase
             'type' => TestElement::class,
             'short_type' => 'test',
             'attributes' => ['name' => 'test'],
+            'sort_order' => 100,
             'additional' => 'data'
         ];
 
@@ -112,6 +114,7 @@ class ConcreteSerializationStrategyWithAdditionalData extends AbstractSerializat
 class TestElement implements HeadElementInterface
 {
     private array $attributes = [];
+    private int $sortOrder = 100;
 
     public function setAttribute(string $name, string $value): self
     {
@@ -149,5 +152,16 @@ class TestElement implements HeadElementInterface
     public function render(): string
     {
         return '<test>';
+    }
+
+    public function getSortOrder(): int
+    {
+        return $this->sortOrder;
+    }
+
+    public function setSortOrder(int $sortOrder): self
+    {
+        $this->sortOrder = $sortOrder;
+        return $this;
     }
 }
