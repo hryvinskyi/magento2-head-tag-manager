@@ -9,24 +9,34 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Model\HeadElement;
 
+use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
 use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
- * Style element
+ * An inline style tag, rendered by the secure renderer so it can carry a content security nonce
  */
 class StyleElement extends AbstractHeadElement
 {
+    /**
+     * @param SecureHtmlRenderer $secureHtmlRenderer renders the tag
+     * @param AttributeRendererInterface $attributeRenderer passed to the parent class
+     * @param array<string,string> $attributes attribute name => value
+     * @param string|null $content style content
+     * @param int $sortOrder the sort order value (lower values render first)
+     */
     public function __construct(
         SecureHtmlRenderer $secureHtmlRenderer,
-        protected array $attributes = [],
+        AttributeRendererInterface $attributeRenderer,
+        array $attributes = [],
         private string|null $content = null,
         int $sortOrder = 100
     ) {
-        parent::__construct($secureHtmlRenderer, $attributes, $sortOrder);
+        parent::__construct($secureHtmlRenderer, $attributeRenderer, $attributes, $sortOrder);
     }
 
     /**
      * Set style content
+     *
      * @param string $content style content
      * @return $this
      */
@@ -38,6 +48,7 @@ class StyleElement extends AbstractHeadElement
 
     /**
      * Get style content
+     *
      * @return string|null
      */
     public function getContent(): ?string
@@ -47,23 +58,15 @@ class StyleElement extends AbstractHeadElement
 
     /**
      * Render the style element
+     *
      * @return string
      */
     public function render(): string
     {
-        if ($this->getContent() === null) {
-            return $this->getSecureHtmlRenderer()->renderTag(
-                'style',
-                $this->getAttributes(),
-                '',
-                false,
-            );
-        }
-
         return $this->getSecureHtmlRenderer()->renderTag(
             'style',
             $this->getAttributes(),
-            $this->getContent(),
+            $this->getContent() ?? '',
             false,
         );
     }

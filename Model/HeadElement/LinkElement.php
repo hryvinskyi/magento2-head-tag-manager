@@ -13,6 +13,7 @@ class LinkElement extends AbstractHeadElement
 {
     /**
      * Render the link element
+     *
      * @return string
      */
     public function render(): string

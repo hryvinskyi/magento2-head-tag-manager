@@ -9,146 +9,255 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Test\Integration;
 
+use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
 use Hryvinskyi\HeadTagManager\Api\Block\BlockCacheDetectorInterface;
 use Hryvinskyi\HeadTagManager\Api\Block\HeadElementTrackerInterface;
 use Hryvinskyi\HeadTagManager\Api\Cache\BlockHeadElementCacheInterface;
+use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Api\HeadTagManagerInterface;
 use Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\HeadElementSerializerInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\Strategy\SerializationStrategyRegistryInterface;
+use Hryvinskyi\HeadTagManager\Model\HeadElement\AbstractHeadElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\Factory\MetaElementFactory;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\Factory\ScriptElementFactory;
+use Hryvinskyi\HeadTagManager\Model\HeadElement\LinkElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElement;
-use Hryvinskyi\HeadTagManager\Model\Registry\HeadElementFactoryRegistry;
-use Hryvinskyi\HeadTagManager\Model\Serializer\HeadElementSerializer;
+use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElement;
 use Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\MetaElementSerializationStrategy;
-use Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\ScriptElementSerializationStrategy;
-use Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\SerializationStrategyRegistry;
+use Magento\Framework\View\Element\AbstractBlock;
 use Magento\Framework\View\Helper\SecureHtmlRenderer;
+use Magento\TestFramework\Helper\Bootstrap;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 
 /**
- * Integration test to verify the complete block-level caching flow works end-to-end
+ * The factory registry, the serializer and the head tag manager resolved through the real container, the block-level
+ * caching flow included
+ *
+ * Elements come from the registry, so the pool's wiring and the generated element factories are exercised with them.
  */
 class HeadTagManagerIntegrationTest extends TestCase
 {
+    /**
+     * @var HeadElementFactoryRegistryInterface
+     */
     private HeadElementFactoryRegistryInterface $factoryRegistry;
+
+    /**
+     * @var SerializationStrategyRegistryInterface
+     */
     private SerializationStrategyRegistryInterface $strategyRegistry;
+
+    /**
+     * @var HeadElementSerializerInterface
+     */
     private HeadElementSerializerInterface $serializer;
 
     protected function setUp(): void
     {
-        // Setup real implementations to test integration
-        $secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $secureHtmlRenderer->method('renderTag')->willReturnCallback(
-            function ($tag, $attributes, $content) {
-                $attrString = '';
-                foreach ($attributes as $name => $value) {
-                    $attrString .= " {$name}=\"{$value}\"";
-                }
-                if ($content) {
-                    return "<{$tag}{$attrString}>{$content}</{$tag}>";
-                }
-                return "<{$tag}{$attrString}>";
-            }
+        $this->factoryRegistry = $this->service(HeadElementFactoryRegistryInterface::class);
+        $this->strategyRegistry = $this->service(SerializationStrategyRegistryInterface::class);
+        $this->serializer = $this->service(HeadElementSerializerInterface::class);
+    }
+
+    /**
+     * Resolves a service through the real container.
+     *
+     * @template T of object
+     * @param class-string<T> $type the interface or class to resolve
+     * @return T
+     */
+    private function service(string $type): object
+    {
+        $service = Bootstrap::getObjectManager()->get($type);
+        self::assertInstanceOf($type, $service);
+
+        return $service;
+    }
+
+    /**
+     * Creates an element through the factory the registry holds for its type.
+     *
+     * @param string $type the element type
+     * @param array<string, mixed> $data the data the factory takes
+     * @return HeadElementInterface
+     */
+    private function element(string $type, array $data = []): HeadElementInterface
+    {
+        $factory = $this->factoryRegistry->getFactoryByType($type);
+        self::assertNotNull($factory);
+
+        return $factory->create($data);
+    }
+
+    /**
+     * Creates a head tag manager that holds no elements.
+     *
+     * @return HeadTagManagerInterface
+     */
+    private function emptyManager(): HeadTagManagerInterface
+    {
+        $manager = Bootstrap::getObjectManager()->create(HeadTagManagerInterface::class);
+        self::assertInstanceOf(HeadTagManagerInterface::class, $manager);
+
+        return $manager;
+    }
+
+    /**
+     * Meta and link tags keep the exact text the static attribute rendering of the previous major version produced
+     */
+    public function testMetaAndLinkRenderByteForByteAsThePreviousMajorVersion(): void
+    {
+        $manager = $this->emptyManager();
+        $manager->addMetaName('description', 'Tom & "Jerry" <b>\'s</b>', 'description');
+        $manager->addMeta(['content' => 'x', 'property' => 'og:title'], 'og');
+        $manager->addCharset();
+        $manager->addLink(['rel' => 'stylesheet', 'href' => '/a.css?x=1&y=2'], 'css');
+        $manager->addLink(
+            ['href' => '/f.woff2', 'as' => 'font', 'rel' => 'preload', 'type' => 'font/woff2', 'crossorigin' => true],
+            'font'
+        );
+        $manager->addLink(
+            ['media' => 'print', 'title' => 't', 'rel' => 'alternate', 'href' => 'https://e.com/?a=1&amp;b=2'],
+            'alternate'
         );
 
-        // Create factory implementations
-        $metaElementFactory = new MetaElementFactory($secureHtmlRenderer);
-        $scriptElementFactory = new ScriptElementFactory($secureHtmlRenderer);
+        /** @noinspection HtmlUnknownTarget */
+        $expected = [
+            '<meta name="description" content="Tom &amp; &quot;Jerry&quot; &lt;b&gt;&#039;s&lt;/b&gt;">',
+            '<meta content="x" property="og:title">',
+            '<meta charset="UTF-8">',
+            '<link href="/a.css?x=1&amp;y=2" rel="stylesheet">',
+            '<link type="font/woff2" href="/f.woff2" rel="preload" as="font" crossorigin>',
+            '<link href="https://e.com/?a=1&amp;amp;b=2" title="t" rel="alternate" media="print">',
+        ];
 
-        // Setup factory registry
-        $this->factoryRegistry = new HeadElementFactoryRegistry([
-            $metaElementFactory,
-            $scriptElementFactory
-        ]);
+        self::assertSame(implode(PHP_EOL, $expected) . PHP_EOL, $manager->render());
+    }
 
-        // Setup strategy registry
-        $metaStrategy = new MetaElementSerializationStrategy($this->factoryRegistry);
-        $scriptStrategy = new ScriptElementSerializationStrategy($this->factoryRegistry);
+    /**
+     * Each type's factory yields its element, with the serializer's `sort_order` key reaching the element
+     */
+    public function testRegistryFactoriesCreateElementsThroughTheContainer(): void
+    {
+        $meta = $this->element('meta', ['attributes' => ['name' => 'a'], 'sort_order' => 3]);
+        $link = $this->element('link', ['attributes' => ['rel' => 'b'], 'sort_order' => 4]);
+        $script = $this->element('script', ['attributes' => ['id' => 'c'], 'content' => 'x();', 'sort_order' => 5]);
+        $style = $this->element('style', ['attributes' => ['id' => 'd'], 'content' => 'a{}', 'sort_order' => 6]);
 
-        $this->strategyRegistry = new SerializationStrategyRegistry([
-            $metaStrategy,
-            $scriptStrategy
-        ]);
+        self::assertInstanceOf(MetaElement::class, $meta);
+        self::assertInstanceOf(LinkElement::class, $link);
+        self::assertInstanceOf(ScriptElement::class, $script);
+        self::assertInstanceOf(StyleElement::class, $style);
+        self::assertSame(['name' => 'a'], $meta->getAttributes());
+        self::assertSame(['rel' => 'b'], $link->getAttributes());
+        self::assertSame(['id' => 'c'], $script->getAttributes());
+        self::assertSame(['id' => 'd'], $style->getAttributes());
+        self::assertSame('x();', $script->getContent());
+        self::assertSame('a{}', $style->getContent());
+        self::assertSame(3, $meta->getSortOrder());
+        self::assertSame(4, $link->getSortOrder());
+        self::assertSame(5, $script->getSortOrder());
+        self::assertSame(6, $style->getSortOrder());
+    }
 
-        // Setup serializer
-        $logger = $this->createMock(LoggerInterface::class);
-        $this->serializer = new HeadElementSerializer(
-            $this->factoryRegistry,
-            $this->strategyRegistry,
-            $logger
+    /**
+     * Without a sort order a style renders ahead of every other element type, and no element shares an instance
+     */
+    public function testDefaultSortOrdersAndFreshInstances(): void
+    {
+        self::assertSame(100, $this->element('meta')->getSortOrder());
+        self::assertSame(100, $this->element('link')->getSortOrder());
+        self::assertSame(100, $this->element('script')->getSortOrder());
+        self::assertSame(10, $this->element('style')->getSortOrder());
+        self::assertNotSame($this->element('meta'), $this->element('meta'));
+    }
+
+    /**
+     * Script and style tags are rendered by the secure renderer the container injects
+     */
+    public function testScriptAndStyleRenderThroughTheSecureRenderer(): void
+    {
+        $manager = $this->emptyManager();
+        $manager->addExternalScript('https://example.com/a.js', [], 'script');
+        $manager->addInlineStyle('a{}', ['media' => 'print'], 'style');
+
+        self::assertSame(
+            [
+                'script' => '<script src="https://example.com/a.js"></script>',
+                'style' => '<style media="print">a{}</style>',
+            ],
+            $manager->getRenderedElements()
         );
     }
 
     public function testCompleteSerializationAndDeserializationFlow(): void
     {
         // Create original elements
-        $secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        
-        $metaElement = new MetaElement($secureHtmlRenderer, ['name' => 'description', 'content' => 'Test']);
-        $scriptElement = new ScriptElement($secureHtmlRenderer, ['type' => 'text/javascript'], 'console.log("test");');
-
         $elements = [
-            'meta_description' => $metaElement,
-            'inline_script' => $scriptElement
+            'meta_description' => $this->element('meta', [
+                'attributes' => ['name' => 'description', 'content' => 'Test'],
+            ]),
+            'inline_script' => $this->element('script', [
+                'attributes' => ['type' => 'text/javascript'],
+                'content' => 'console.log("test");',
+            ]),
         ];
 
         // Serialize elements
         $serializedData = $this->serializer->serialize($elements);
 
         // Verify serialized data structure
-        $this->assertArrayHasKey('meta_description', $serializedData);
-        $this->assertArrayHasKey('inline_script', $serializedData);
-
-        // Verify meta element serialization
-        $metaData = $serializedData['meta_description'];
-        $this->assertEquals(MetaElement::class, $metaData['type']);
-        $this->assertEquals('meta', $metaData['short_type']);
-        $this->assertEquals(['name' => 'description', 'content' => 'Test'], $metaData['attributes']);
-        $this->assertEquals(100, $metaData['sort_order']);
-
-        // Verify script element serialization
-        $scriptData = $serializedData['inline_script'];
-        $this->assertEquals(ScriptElement::class, $scriptData['type']);
-        $this->assertEquals('script', $scriptData['short_type']);
-        $this->assertEquals(['type' => 'text/javascript'], $scriptData['attributes']);
-        $this->assertEquals('console.log("test");', $scriptData['content']);
-        $this->assertEquals(100, $scriptData['sort_order']);
+        self::assertSame(
+            [
+                'meta_description' => [
+                    'type' => MetaElement::class,
+                    'short_type' => 'meta',
+                    'attributes' => ['name' => 'description', 'content' => 'Test'],
+                    'sort_order' => 100,
+                ],
+                'inline_script' => [
+                    'type' => ScriptElement::class,
+                    'short_type' => 'script',
+                    'attributes' => ['type' => 'text/javascript'],
+                    'sort_order' => 100,
+                    'content' => 'console.log("test");',
+                ],
+            ],
+            $serializedData
+        );
 
         // Deserialize elements
         $deserializedElements = $this->serializer->unserialize($serializedData);
 
         // Verify deserialized elements
-        $this->assertCount(2, $deserializedElements);
-        $this->assertArrayHasKey('meta_description', $deserializedElements);
-        $this->assertArrayHasKey('inline_script', $deserializedElements);
+        self::assertCount(2, $deserializedElements);
+        self::assertArrayHasKey('meta_description', $deserializedElements);
+        self::assertArrayHasKey('inline_script', $deserializedElements);
 
         $deserializedMeta = $deserializedElements['meta_description'];
         $deserializedScript = $deserializedElements['inline_script'];
 
         // Verify meta element reconstruction
-        $this->assertInstanceOf(MetaElement::class, $deserializedMeta);
-        $this->assertEquals(['name' => 'description', 'content' => 'Test'], $deserializedMeta->getAttributes());
-        $this->assertEquals(100, $deserializedMeta->getSortOrder());
+        self::assertInstanceOf(MetaElement::class, $deserializedMeta);
+        self::assertEquals(['name' => 'description', 'content' => 'Test'], $deserializedMeta->getAttributes());
+        self::assertEquals(100, $deserializedMeta->getSortOrder());
 
         // Verify script element reconstruction
-        $this->assertInstanceOf(ScriptElement::class, $deserializedScript);
-        $this->assertEquals(['type' => 'text/javascript'], $deserializedScript->getAttributes());
-        $this->assertEquals('console.log("test");', $deserializedScript->getContent());
-        $this->assertEquals(100, $deserializedScript->getSortOrder());
+        self::assertInstanceOf(ScriptElement::class, $deserializedScript);
+        self::assertEquals(['type' => 'text/javascript'], $deserializedScript->getAttributes());
+        self::assertEquals('console.log("test");', $deserializedScript->getContent());
+        self::assertEquals(100, $deserializedScript->getSortOrder());
     }
 
     public function testStrategyRegistryIntegration(): void
     {
-        $secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $metaElement = new MetaElement($secureHtmlRenderer, ['name' => 'keywords', 'content' => 'test']);
+        $metaElement = $this->element('meta', ['attributes' => ['name' => 'keywords', 'content' => 'test']]);
 
         // Verify strategy can be found for element
         $strategy = $this->strategyRegistry->getStrategyForElement($metaElement);
-        $this->assertInstanceOf(MetaElementSerializationStrategy::class, $strategy);
+        self::assertInstanceOf(MetaElementSerializationStrategy::class, $strategy);
 
         // Verify strategy can serialize element
         $serializedData = $strategy->serialize($metaElement, 'test-key');
@@ -160,22 +269,22 @@ class HeadTagManagerIntegrationTest extends TestCase
             'sort_order' => 100
         ];
 
-        $this->assertEquals($expected, $serializedData);
+        self::assertEquals($expected, $serializedData);
     }
 
     public function testFactoryRegistryIntegration(): void
     {
         // Test factory lookup by type
         $metaFactory = $this->factoryRegistry->getFactoryByType('meta');
-        $this->assertInstanceOf(MetaElementFactory::class, $metaFactory);
+        self::assertInstanceOf(MetaElementFactory::class, $metaFactory);
 
         // Test factory lookup by class name
         $scriptFactory = $this->factoryRegistry->getFactoryByClassName(ScriptElement::class);
-        $this->assertInstanceOf(ScriptElementFactory::class, $scriptFactory);
+        self::assertInstanceOf(ScriptElementFactory::class, $scriptFactory);
 
         // Test element type lookup
         $elementType = $this->factoryRegistry->getElementTypeByClassName(MetaElement::class);
-        $this->assertEquals('meta', $elementType);
+        self::assertEquals('meta', $elementType);
     }
 
     public function testBackwardCompatibilityWithShortTypes(): void
@@ -195,25 +304,32 @@ class HeadTagManagerIntegrationTest extends TestCase
 
         $deserializedElements = $this->serializer->unserialize($legacyData);
 
-        $this->assertCount(2, $deserializedElements);
-        
+        self::assertCount(2, $deserializedElements);
+
         $metaElement = $deserializedElements['meta_key'];
         $scriptElement = $deserializedElements['script_key'];
 
-        $this->assertInstanceOf(MetaElement::class, $metaElement);
-        $this->assertInstanceOf(ScriptElement::class, $scriptElement);
-        
-        $this->assertEquals(['name' => 'author', 'content' => 'Test Author'], $metaElement->getAttributes());
-        $this->assertEquals(['defer' => 'defer'], $scriptElement->getAttributes());
-        $this->assertEquals('alert("legacy");', $scriptElement->getContent());
+        self::assertInstanceOf(MetaElement::class, $metaElement);
+        self::assertInstanceOf(ScriptElement::class, $scriptElement);
+
+        self::assertEquals(['name' => 'author', 'content' => 'Test Author'], $metaElement->getAttributes());
+        self::assertEquals(['defer' => 'defer'], $scriptElement->getAttributes());
+        self::assertEquals('alert("legacy");', $scriptElement->getContent());
     }
 
     public function testSerializationWithoutStrategy(): void
     {
         // Create an unknown element class for testing
-        $secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $unknownElement = new class($secureHtmlRenderer, ['custom' => 'attribute']) extends \Hryvinskyi\HeadTagManager\Model\HeadElement\AbstractHeadElement {
-            public function render(): string {
+        $unknownElement = new class (
+            $this->service(SecureHtmlRenderer::class),
+            $this->service(AttributeRendererInterface::class),
+            ['custom' => 'attribute']
+        ) extends AbstractHeadElement {
+            /**
+             * @inheritDoc
+             */
+            public function render(): string
+            {
                 return '<unknown' . $this->attributesToString() . '>';
             }
         };
@@ -222,26 +338,30 @@ class HeadTagManagerIntegrationTest extends TestCase
         $serializedData = $this->serializer->serialize($elements);
 
         // Should fall back to basic serialization
-        $this->assertArrayHasKey('unknown', $serializedData);
-        $unknownData = $serializedData['unknown'];
-
-        $this->assertEquals(get_class($unknownElement), $unknownData['type']);
-        $this->assertEquals('unknown', $unknownData['short_type']);
-        $this->assertEquals(['custom' => 'attribute'], $unknownData['attributes']);
-        $this->assertEquals(100, $unknownData['sort_order']);
-        $this->assertNull($unknownData['content']);
+        self::assertSame(
+            [
+                'unknown' => [
+                    'type' => get_class($unknownElement),
+                    'short_type' => 'unknown',
+                    'attributes' => ['custom' => 'attribute'],
+                    'sort_order' => 100,
+                    'content' => null,
+                ],
+            ],
+            $serializedData
+        );
+        self::assertSame('<unknown custom="attribute">', $unknownElement->render());
     }
 
     public function testBlockLevelCachingFlow(): void
     {
         // Create mocks for block-level caching components
-        $headTagManager = $this->createMock(HeadTagManagerInterface::class);
         $blockCache = $this->createMock(BlockHeadElementCacheInterface::class);
         $cacheDetector = $this->createMock(BlockCacheDetectorInterface::class);
         $elementTracker = $this->createMock(HeadElementTrackerInterface::class);
 
         // Mock a block
-        $block = $this->createMock(\Magento\Framework\View\Element\AbstractBlock::class);
+        $block = $this->createMock(AbstractBlock::class);
         $block->method('getNameInLayout')->willReturn('test_block');
         $block->method('getCacheKey')->willReturn('test_cache_key');
 
@@ -250,9 +370,9 @@ class HeadTagManagerIntegrationTest extends TestCase
         $cacheDetector->method('isBlockCached')->with($block)->willReturn(false);
 
         // Create test elements
-        $secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $metaElement = new MetaElement($secureHtmlRenderer, ['name' => 'test', 'content' => 'value']);
-        $newElements = ['meta_test' => $metaElement];
+        $newElements = [
+            'meta_test' => $this->element('meta', ['attributes' => ['name' => 'test', 'content' => 'value']]),
+        ];
 
         // Test tracker flow
         $elementTracker->expects($this->once())
@@ -280,8 +400,6 @@ class HeadTagManagerIntegrationTest extends TestCase
                 }
             }
         }
-
-        $this->assertTrue(true); // Test passes if no exceptions thrown
     }
 
     public function testBlockCacheRestoration(): void
@@ -291,13 +409,12 @@ class HeadTagManagerIntegrationTest extends TestCase
         $blockCache = $this->createMock(BlockHeadElementCacheInterface::class);
 
         // Mock a block
-        $block = $this->createMock(\Magento\Framework\View\Element\AbstractBlock::class);
+        $block = $this->createMock(AbstractBlock::class);
         $block->method('getNameInLayout')->willReturn('cached_block');
         $block->method('getCacheKey')->willReturn('cached_block_key');
 
         // Create cached elements
-        $secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $cachedMetaElement = new MetaElement($secureHtmlRenderer, ['name' => 'cached', 'content' => 'data']);
+        $cachedMetaElement = $this->element('meta', ['attributes' => ['name' => 'cached', 'content' => 'data']]);
         $cachedElements = ['cached_meta' => $cachedMetaElement];
 
         // Mock cache loading
@@ -320,6 +437,6 @@ class HeadTagManagerIntegrationTest extends TestCase
             }
         }
 
-        $this->assertEquals($cachedElements, $loadedElements);
+        self::assertEquals($cachedElements, $loadedElements);
     }
 }

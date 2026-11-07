@@ -9,7 +9,8 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Model\HeadElement;
 
-use Hryvinskyi\Base\Helper\Html;
+use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
+use Hryvinskyi\Base\Exception\InvalidParamException;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
@@ -18,8 +19,15 @@ use Magento\Framework\View\Helper\SecureHtmlRenderer;
  */
 abstract class AbstractHeadElement implements HeadElementInterface
 {
+    /**
+     * @param SecureHtmlRenderer $secureHtmlRenderer renders the tags that carry content
+     * @param AttributeRendererInterface $attributeRenderer renders the attributes of the tags built as text
+     * @param array<string,string> $attributes attribute name => value
+     * @param int $sortOrder the sort order value (lower values render first)
+     */
     public function __construct(
         private readonly SecureHtmlRenderer $secureHtmlRenderer,
+        private readonly AttributeRendererInterface $attributeRenderer,
         protected array $attributes = [],
         protected int $sortOrder = 100
     ) {
@@ -49,6 +57,7 @@ abstract class AbstractHeadElement implements HeadElementInterface
 
     /**
      * Set an attribute for the element
+     *
      * @param string $name Attribute name
      * @param string $value Attribute value
      * @return $this
@@ -61,7 +70,8 @@ abstract class AbstractHeadElement implements HeadElementInterface
 
     /**
      * Set multiple attributes at once
-     * @param array $attributes Associative array of attributes
+     *
+     * @param array<string,string> $attributes Associative array of attributes
      * @return $this
      */
     public function setAttributes(array $attributes): self
@@ -74,6 +84,7 @@ abstract class AbstractHeadElement implements HeadElementInterface
 
     /**
      * Get an attribute value
+     *
      * @param string $name Attribute name
      * @param string|null $default Default value if attribute doesn't exist
      * @return string|null
@@ -85,7 +96,8 @@ abstract class AbstractHeadElement implements HeadElementInterface
 
     /**
      * Get all attributes
-     * @return array
+     *
+     * @return array<string,string>
      */
     public function getAttributes(): array
     {
@@ -94,6 +106,7 @@ abstract class AbstractHeadElement implements HeadElementInterface
 
     /**
      * Check if attribute exists
+     *
      * @param string $name Attribute name
      * @return bool
      */
@@ -104,6 +117,7 @@ abstract class AbstractHeadElement implements HeadElementInterface
 
     /**
      * Remove an attribute
+     *
      * @param string $name Attribute name
      * @return $this
      */
@@ -125,10 +139,12 @@ abstract class AbstractHeadElement implements HeadElementInterface
 
     /**
      * Convert attributes to HTML string
+     *
      * @return string
+     * @throws InvalidParamException when an attribute value has no text form
      */
     protected function attributesToString(): string
     {
-        return Html::renderTagAttributes($this->attributes);
+        return $this->attributeRenderer->render($this->attributes);
     }
 }

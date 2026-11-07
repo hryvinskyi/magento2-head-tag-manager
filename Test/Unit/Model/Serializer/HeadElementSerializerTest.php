@@ -180,6 +180,24 @@ class HeadElementSerializerTest extends TestCase
         $this->assertEquals(['key1' => $element], $result);
     }
 
+    public function testUnserializeReadsAnInterceptorAsTheClassItWraps(): void
+    {
+        $element = $this->createMock(HeadElementInterface::class);
+        $factory = $this->createMock(\Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementFactoryInterface::class);
+        $factory->method('create')->willReturn($element);
+
+        $this->factoryRegistry->expects($this->once())
+            ->method('getFactoryByClassName')
+            ->with('Vendor\\Module\\CustomElement')
+            ->willReturn($factory);
+
+        $result = $this->serializer->unserialize([
+            'key' => ['type' => 'Vendor\\Module\\CustomElement\\Interceptor', 'attributes' => []],
+        ]);
+
+        $this->assertSame(['key' => $element], $result);
+    }
+
     public function testUnserializeWithNoFactory(): void
     {
         $elementData = [

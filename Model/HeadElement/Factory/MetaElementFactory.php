@@ -11,26 +11,33 @@ namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElement;
-use Magento\Framework\View\Helper\SecureHtmlRenderer;
+use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElementFactory as MetaElementObjectFactory;
 
 /**
  * Factory for creating MetaElement instances
  */
 class MetaElementFactory extends AbstractHeadElementFactory
 {
+    /**
+     * @param MetaElementObjectFactory $elementFactory creates the element with its services injected
+     */
     public function __construct(
-        private readonly SecureHtmlRenderer $secureHtmlRenderer
+        private readonly MetaElementObjectFactory $elementFactory
     ) {
     }
 
     /**
-     * @inheritDoc
+     * Create the meta element
+     *
+     * @param array<string,mixed> $data the element's `attributes` and `sort_order`
+     * @return HeadElementInterface
      */
     public function create(array $data = []): HeadElementInterface
     {
-        $attributes = $data['attributes'] ?? [];
-        $sortOrder = $data['sort_order'] ?? 100;
-        return new MetaElement($this->secureHtmlRenderer, $attributes, $sortOrder);
+        return $this->elementFactory->create([
+            'attributes' => $data['attributes'] ?? [],
+            'sortOrder' => $data['sort_order'] ?? 100,
+        ]);
     }
 
     /**

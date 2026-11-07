@@ -13,6 +13,10 @@ use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementFactoryInterface;
 
 /**
  * Abstract base factory for head elements
+ *
+ * The generated element factories pass the attributes through the object manager, which in developer mode reads an
+ * `argument` key of an array as a reference to a global argument: an HTML attribute of that name empties the attributes
+ * there, and survives in production mode.
  */
 abstract class AbstractHeadElementFactory implements HeadElementFactoryInterface
 {

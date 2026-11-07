@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-11-07
+
+### Changed
+- **BREAKING**: Requires `hryvinskyi/magento2-base` `^3.0`; the module is declared in the `sequence` of `etc/module.xml`
+- **BREAKING**: `AbstractHeadElement::__construct()` takes `Hryvinskyi\Base\Api\Html\AttributeRendererInterface` as its second parameter, before `$attributes`. `ScriptElement` and `StyleElement` take and pass it too, and a subclass of any element has to do the same
+- **BREAKING**: `LinkElementFactory`, `MetaElementFactory`, `ScriptElementFactory` and `StyleElementFactory` take the element's generated factory in place of `SecureHtmlRenderer`, so an element now comes from the object manager. Their `create()` data and `getElementType()` / `getElementClassName()` are unchanged
+- Attributes render through `AttributeRendererInterface` in place of the static `Html::renderTagAttributes()`; the rendered HTML is byte-identical, with one exception: in developer mode the object manager reads an `attributes` array holding a key literally named `argument` as a configuration reference and empties it, while production mode keeps it. No HTML attribute has that name
+- Elements with a plugin keep working in the block head cache: a cached interceptor's class is read as the class it wraps, which is the one that has a factory
+- **BREAKING**: `HeadElementInterface` declares `getAttributes()`, which the serializers already called; an implementation outside this module has to add it
+- Declares `magento/module-store`, which the block observer already used
+- An attribute value without a text form now raises `Hryvinskyi\Base\Exception\InvalidParamException`
+
 ## [2.3.5] - 2025-01-27
 
 ### Added

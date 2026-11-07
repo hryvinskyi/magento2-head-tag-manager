@@ -20,6 +20,11 @@ use Psr\Log\LoggerInterface;
  */
 class HeadElementSerializer implements HeadElementSerializerInterface
 {
+    /**
+     * @param HeadElementFactoryRegistryInterface $factoryRegistry finds the factory that recreates an element
+     * @param SerializationStrategyRegistryInterface $strategyRegistry finds the strategy that serializes an element
+     * @param LoggerInterface $logger records an element that cannot be serialized or recreated
+     */
     public function __construct(
         private readonly HeadElementFactoryRegistryInterface $factoryRegistry,
         private readonly SerializationStrategyRegistryInterface $strategyRegistry,
@@ -29,6 +34,8 @@ class HeadElementSerializer implements HeadElementSerializerInterface
 
     /**
      * @inheritDoc
+     *
+     * @return array<int|string, array<mixed>>
      */
     public function serialize(array $elements): array
     {
@@ -59,6 +66,9 @@ class HeadElementSerializer implements HeadElementSerializerInterface
 
     /**
      * @inheritDoc
+     *
+     * @param array<int|string,array<string,mixed>> $data
+     * @return array<string, HeadElementInterface>
      */
     public function unserialize(array $data): array
     {
@@ -84,16 +94,21 @@ class HeadElementSerializer implements HeadElementSerializerInterface
 
     /**
      * Recreate element from serialized data using the factory registry
+     *
+     * @param array<string,mixed> $elementData the data the serialization gave
+     * @return HeadElementInterface|null the element, or null when nothing can recreate it
      */
     private function recreateElement(array $elementData): ?HeadElementInterface
     {
         $type = $elementData['type'] ?? $elementData['short_type'] ?? null;
-        $attributes = $elementData['attributes'] ?? [];
-        $content = $elementData['content'] ?? null;
-
-        if (!$type) {
+        if (!is_string($type) || $type === '') {
             return null;
         }
+
+        // With a plugin the object manager returns the generated interceptor, which no factory is registered for.
+        $type = (string) preg_replace('/\\\\Interceptor$/', '', $type);
+        $attributes = $elementData['attributes'] ?? [];
+        $content = $elementData['content'] ?? null;
 
         // Try to get factory by full class name first
         $factory = $this->factoryRegistry->getFactoryByClassName($type);
@@ -123,6 +138,9 @@ class HeadElementSerializer implements HeadElementSerializerInterface
 
     /**
      * Fallback serialization when no strategy is found
+     *
+     * @param HeadElementInterface $element the element to serialize
+     * @return array<string, mixed> the element's data
      */
     private function fallbackSerialize(HeadElementInterface $element): array
     {

@@ -11,27 +11,34 @@ namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElement;
-use Magento\Framework\View\Helper\SecureHtmlRenderer;
+use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElementFactory as ScriptElementObjectFactory;
 
 /**
  * Factory for creating ScriptElement instances
  */
 class ScriptElementFactory extends AbstractHeadElementFactory
 {
+    /**
+     * @param ScriptElementObjectFactory $elementFactory creates the element with its services injected
+     */
     public function __construct(
-        private readonly SecureHtmlRenderer $secureHtmlRenderer
+        private readonly ScriptElementObjectFactory $elementFactory
     ) {
     }
 
     /**
-     * @inheritDoc
+     * Create the script element
+     *
+     * @param array<string,mixed> $data the element's `attributes`, `content` and `sort_order`
+     * @return HeadElementInterface
      */
     public function create(array $data = []): HeadElementInterface
     {
-        $attributes = $data['attributes'] ?? [];
-        $content = $data['content'] ?? null;
-        $sortOrder = $data['sort_order'] ?? 100;
-        return new ScriptElement($this->secureHtmlRenderer, $attributes, $content, $sortOrder);
+        return $this->elementFactory->create([
+            'attributes' => $data['attributes'] ?? [],
+            'content' => $data['content'] ?? null,
+            'sortOrder' => $data['sort_order'] ?? 100,
+        ]);
     }
 
     /**

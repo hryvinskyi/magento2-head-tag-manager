@@ -1,0 +1,16 @@
+parameters:
+    level: 10
+    phpVersion: 80100
+    paths:
+        - Api/HeadElement/HeadElementInterface.php
+        - Model/HeadElement
+        - Model/Serializer/HeadElementSerializer.php
+        - Model/Serializer/Strategy/AbstractSerializationStrategy.php
+        - Test/Integration
+        - Test/Unit/Model/HeadElement
+        - Test/Unit/bootstrap.php
+    bootstrapFiles:
+        - ../../../vendor/autoload.php
+    scanDirectories:
+        - ../../../generated/code
+        - ../../../dev/tests/integration/framework

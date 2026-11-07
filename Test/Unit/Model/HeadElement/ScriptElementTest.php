@@ -9,22 +9,34 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement;
 
+use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElement;
 use Magento\Framework\View\Helper\SecureHtmlRenderer;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class ScriptElementTest extends TestCase
 {
-    private $secureHtmlRenderer;
-    private $scriptElement;
+    /**
+     * @var SecureHtmlRenderer&MockObject
+     */
+    private MockObject $secureHtmlRenderer;
+
+    /**
+     * @var ScriptElement
+     */
+    private ScriptElement $scriptElement;
 
     protected function setUp(): void
     {
         $this->secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $this->scriptElement = new ScriptElement($this->secureHtmlRenderer);
+        $this->scriptElement = new ScriptElement(
+            $this->secureHtmlRenderer,
+            $this->createMock(AttributeRendererInterface::class)
+        );
     }
 
-    public function testCanSetAndGetContent()
+    public function testCanSetAndGetContent(): void
     {
         $content = 'console.log("test");';
         $this->scriptElement->setContent($content);
@@ -32,7 +44,7 @@ class ScriptElementTest extends TestCase
         $this->assertEquals($content, $this->scriptElement->getContent());
     }
 
-    public function testRendersScriptWithContent()
+    public function testRendersScriptWithContent(): void
     {
         $content = 'console.log("test");';
         $this->scriptElement->setContent($content);
@@ -45,7 +57,7 @@ class ScriptElementTest extends TestCase
         $this->assertEquals('<script>console.log("test");</script>', $this->scriptElement->render());
     }
 
-    public function testRendersScriptWithAttributes()
+    public function testRendersScriptWithAttributes(): void
     {
         $attributes = ['src' => 'script.js', 'async' => 'async'];
         $this->scriptElement->setAttributes($attributes);
@@ -55,5 +67,20 @@ class ScriptElementTest extends TestCase
             ->willReturn('<script src="script.js" async="async"></script>');
 
         $this->assertEquals('<script src="script.js" async="async"></script>', $this->scriptElement->render());
+    }
+
+    public function testConstructorTakesAttributesContentAndSortOrder(): void
+    {
+        $element = new ScriptElement(
+            $this->secureHtmlRenderer,
+            $this->createMock(AttributeRendererInterface::class),
+            ['src' => 'script.js'],
+            'console.log("test");',
+            7
+        );
+
+        $this->assertSame(['src' => 'script.js'], $element->getAttributes());
+        $this->assertSame('console.log("test");', $element->getContent());
+        $this->assertSame(7, $element->getSortOrder());
     }
 }

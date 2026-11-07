@@ -131,7 +131,7 @@ $headManager->addStylesheet('styles.css');
 
 // Deferred scripts load later (sort_order = 200)
 $headManager->createElement('script', [
-    'attributes' => ['src' => 'analytics.js', 'defer' => true],
+    'attributes' => ['src' => 'analytics.js', 'defer' => 'defer'],
     'sort_order' => 200
 ]);
 ```
@@ -144,7 +144,7 @@ Elements with the same sort order maintain their insertion order (stable sort).
 
 To add support for a new head element type:
 
-1. **Create Element Class**: Implement `HeadElementInterface`
+1. **Create Element Class**: Implement `HeadElementInterface`, or extend `AbstractHeadElement`, whose constructor takes `SecureHtmlRenderer` and `AttributeRendererInterface` before `$attributes`
 2. **Create Factory**: Extend `AbstractHeadElementFactory`
 3. **Create Strategy**: Implement `HeadElementSerializationStrategyInterface`
 4. **Register via DI**: Add to `di.xml` configuration
@@ -197,15 +197,24 @@ class CustomElement implements HeadElementInterface
 class CustomElementFactory extends AbstractHeadElementFactory
 {
     /**
+     * @param \Vendor\Module\Model\CustomElementFactory $elementFactory Magento's generated factory for the element
+     */
+    public function __construct(
+        private readonly \Vendor\Module\Model\CustomElementFactory $elementFactory
+    ) {
+    }
+
+    /**
      * @inheritDoc
      */
     public function create(array $data = []): HeadElementInterface
     {
-        return new CustomElement(
-            $data['attributes'] ?? [],
-            $data['content'] ?? '',
-            $data['sort_order'] ?? 100
-        );
+        // The generated factory's keys are the constructor's parameter names
+        return $this->elementFactory->create([
+            'attributes' => $data['attributes'] ?? [],
+            'content' => $data['content'] ?? '',
+            'sortOrder' => $data['sort_order'] ?? 100,
+        ]);
     }
 
     /**
@@ -252,14 +261,14 @@ class CustomElementSerializationStrategy implements HeadElementSerializationStra
 To register your custom element and factory, add the following to your `di.xml`:
 
 ```xml
-<type name="Hryvinskyi\HeadTagManager\Factory\HeadElementFactoryRegistry">
+<type name="Hryvinskyi\HeadTagManager\Model\Registry\HeadElementFactoryRegistry">
     <arguments>
         <argument name="factories" xsi:type="array">
             <item name="custom" xsi:type="object">Vendor\Module\Factory\CustomElementFactory</item>
         </argument>
     </arguments>
 </type>
-<type name="Hryvinskyi\HeadTagManager\Strategy\SerializationStrategyRegistry">
+<type name="Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\SerializationStrategyRegistry">
     <arguments>
         <argument name="strategies" xsi:type="array">
             <item name="custom" xsi:type="object">Vendor\Module\Strategy\CustomElementSerializationStrategy</item>

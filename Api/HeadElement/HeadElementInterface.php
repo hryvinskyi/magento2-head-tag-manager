@@ -22,6 +22,13 @@ interface HeadElementInterface
     public function render(): string;
 
     /**
+     * Get all attributes
+     *
+     * @return array<string,string> attribute name => value
+     */
+    public function getAttributes(): array;
+
+    /**
      * Get the sort order for rendering
      *
      * @return int The sort order value (lower values render first)

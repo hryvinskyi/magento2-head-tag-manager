@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -11,64 +11,66 @@ namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement\Factory;
 
 use Hryvinskyi\HeadTagManager\Model\HeadElement\Factory\MetaElementFactory;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElement;
-use Magento\Framework\View\Helper\SecureHtmlRenderer;
-use PHPUnit\Framework\TestCase;
+use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElementFactory as MetaElementObjectFactory;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Test for MetaElementFactory
  */
 class MetaElementFactoryTest extends TestCase
 {
-    private SecureHtmlRenderer|MockObject $secureHtmlRendererMock;
+    /**
+     * @var MetaElementObjectFactory&MockObject
+     */
+    private MockObject $elementFactory;
+
+    /**
+     * @var MetaElementFactory
+     */
     private MetaElementFactory $factory;
 
     protected function setUp(): void
     {
-        $this->secureHtmlRendererMock = $this->createMock(SecureHtmlRenderer::class);
-        $this->factory = new MetaElementFactory($this->secureHtmlRendererMock);
+        $this->elementFactory = $this->createMock(MetaElementObjectFactory::class);
+        $this->factory = new MetaElementFactory($this->elementFactory);
     }
 
     /**
-     * Test creating a MetaElement with attributes
+     * The generated factory is asked with the element's constructor parameter names and its element is returned
      */
-    public function testCreate(): void
+    public function testAsksTheGeneratedFactoryWithConstructorParameterNames(): void
     {
-        $data = ['attributes' => ['name' => 'description', 'content' => 'Test']];
+        $element = $this->createMock(MetaElement::class);
+        $this->elementFactory->expects($this->once())
+            ->method('create')
+            ->with([
+                'attributes' => ['name' => 'description', 'content' => 'Test'],
+                'sortOrder' => 7,
+            ])
+            ->willReturn($element);
 
-        $result = $this->factory->create($data);
-
-        $this->assertInstanceOf(MetaElement::class, $result);
-        $this->assertEquals(['name' => 'description', 'content' => 'Test'], $result->getAttributes());
+        $this->assertSame($element, $this->factory->create([
+            'attributes' => ['name' => 'description', 'content' => 'Test'],
+            'sort_order' => 7,
+        ]));
     }
 
     /**
-     * Test creating a MetaElement without attributes
+     * Keys the element does not know are not passed on, and what is missing takes the defaults
      */
-    public function testCreateWithoutAttributes(): void
+    public function testAppliesDefaultsAndIgnoresUnknownKeys(): void
     {
-        $data = [];
+        $element = $this->createMock(MetaElement::class);
+        $this->elementFactory->expects($this->once())
+            ->method('create')
+            ->with([
+                'attributes' => [],
+                'sortOrder' => 100,
+            ])
+            ->willReturn($element);
 
-        $result = $this->factory->create($data);
-
-        $this->assertInstanceOf(MetaElement::class, $result);
-        $this->assertEquals([], $result->getAttributes());
-    }
-
-    /**
-     * Test creating a MetaElement with custom data structure
-     */
-    public function testCreateWithCustomData(): void
-    {
-        $data = [
-            'attributes' => ['property' => 'og:title', 'content' => 'My Title'],
-            'other_field' => 'ignored' // Should be ignored
-        ];
-
-        $result = $this->factory->create($data);
-
-        $this->assertInstanceOf(MetaElement::class, $result);
-        $this->assertEquals(['property' => 'og:title', 'content' => 'My Title'], $result->getAttributes());
+        $this->assertSame($element, $this->factory->create(['other_field' => 'ignored']));
     }
 
     /**

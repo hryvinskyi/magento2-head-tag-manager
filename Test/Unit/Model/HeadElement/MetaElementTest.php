@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -10,42 +10,57 @@ declare(strict_types=1);
 namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement;
 
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElement;
+use Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement\Fixture\RealAttributeRenderer;
 use Magento\Framework\View\Helper\SecureHtmlRenderer;
 use PHPUnit\Framework\TestCase;
 
 class MetaElementTest extends TestCase
 {
-    private $secureHtmlRenderer;
-    private $metaElement;
+    /**
+     * @var MetaElement
+     */
+    private MetaElement $metaElement;
 
     protected function setUp(): void
     {
-        $this->secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $this->metaElement = new MetaElement($this->secureHtmlRenderer);
+        $this->metaElement = new MetaElement(
+            $this->createMock(SecureHtmlRenderer::class),
+            (new RealAttributeRenderer())->build()
+        );
     }
 
-    public function testRendersMetaElementWithAttributes()
+    public function testRendersMetaElementWithAttributes(): void
     {
         $this->metaElement->setAttributes([
             'name' => 'description',
             'content' => 'Page description'
         ]);
 
-        $this->assertEquals(
+        $this->assertSame(
             '<meta name="description" content="Page description">',
             $this->metaElement->render()
         );
     }
 
-    public function testRendersEmptyMetaElementWithNoAttributes()
+    public function testRendersEmptyMetaElementWithNoAttributes(): void
     {
-        $this->assertEquals('<meta>', $this->metaElement->render());
+        $this->assertSame('<meta>', $this->metaElement->render());
     }
 
-    public function testRendersCharsetMetaElement()
+    public function testRendersCharsetMetaElement(): void
     {
         $this->metaElement->setAttribute('charset', 'UTF-8');
 
-        $this->assertEquals('<meta charset="UTF-8">', $this->metaElement->render());
+        $this->assertSame('<meta charset="UTF-8">', $this->metaElement->render());
+    }
+
+    public function testEncodesAttributeValues(): void
+    {
+        $this->metaElement->setAttributes(['name' => 'description', 'content' => 'Tom & "Jerry" <b>\'s</b>']);
+
+        $this->assertSame(
+            '<meta name="description" content="Tom &amp; &quot;Jerry&quot; &lt;b&gt;&#039;s&lt;/b&gt;">',
+            $this->metaElement->render()
+        );
     }
 }

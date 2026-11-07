@@ -7,22 +7,34 @@
 
 namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement;
 
+use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElement;
 use Magento\Framework\View\Helper\SecureHtmlRenderer;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class StyleElementTest extends TestCase
 {
-    private $secureHtmlRenderer;
-    private $styleElement;
+    /**
+     * @var SecureHtmlRenderer&MockObject
+     */
+    private MockObject $secureHtmlRenderer;
+
+    /**
+     * @var StyleElement
+     */
+    private StyleElement $styleElement;
 
     protected function setUp(): void
     {
         $this->secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $this->styleElement = new StyleElement($this->secureHtmlRenderer);
+        $this->styleElement = new StyleElement(
+            $this->secureHtmlRenderer,
+            $this->createMock(AttributeRendererInterface::class)
+        );
     }
 
-    public function testCanSetAndGetContent()
+    public function testCanSetAndGetContent(): void
     {
         $content = 'body { color: red; }';
         $this->styleElement->setContent($content);
@@ -30,7 +42,7 @@ class StyleElementTest extends TestCase
         $this->assertEquals($content, $this->styleElement->getContent());
     }
 
-    public function testRendersStyleWithContent()
+    public function testRendersStyleWithContent(): void
     {
         $content = 'body { color: red; }';
         $this->styleElement->setContent($content);
@@ -42,7 +54,7 @@ class StyleElementTest extends TestCase
         $this->assertEquals('<style>body { color: red; }</style>', $this->styleElement->render());
     }
 
-    public function testRendersStyleWithAttributes()
+    public function testRendersStyleWithAttributes(): void
     {
         $attributes = ['type' => 'text/css', 'media' => 'screen'];
         $this->styleElement->setAttributes($attributes);
@@ -52,5 +64,20 @@ class StyleElementTest extends TestCase
             ->willReturn('<style type="text/css" media="screen"></style>');
 
         $this->assertEquals('<style type="text/css" media="screen"></style>', $this->styleElement->render());
+    }
+
+    public function testConstructorTakesAttributesContentAndSortOrder(): void
+    {
+        $element = new StyleElement(
+            $this->secureHtmlRenderer,
+            $this->createMock(AttributeRendererInterface::class),
+            ['media' => 'screen'],
+            'body { color: red; }',
+            7
+        );
+
+        $this->assertSame(['media' => 'screen'], $element->getAttributes());
+        $this->assertSame('body { color: red; }', $element->getContent());
+        $this->assertSame(7, $element->getSortOrder());
     }
 }

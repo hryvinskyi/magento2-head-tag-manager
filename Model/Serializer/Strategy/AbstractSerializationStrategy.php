@@ -18,6 +18,9 @@ use Hryvinskyi\HeadTagManager\Api\Serializer\Strategy\HeadElementSerializationSt
  */
 abstract class AbstractSerializationStrategy implements HeadElementSerializationStrategyInterface
 {
+    /**
+     * @param HeadElementFactoryRegistryInterface $factoryRegistry finds the factory that recreates an element
+     */
     public function __construct(
         protected readonly HeadElementFactoryRegistryInterface $factoryRegistry
     ) {
@@ -33,6 +36,8 @@ abstract class AbstractSerializationStrategy implements HeadElementSerialization
 
     /**
      * @inheritDoc
+     *
+     * @return array<string, mixed>
      */
     public function serialize(HeadElementInterface $element, string $key): array
     {
@@ -54,10 +59,11 @@ abstract class AbstractSerializationStrategy implements HeadElementSerialization
 
     /**
      * Get additional serialization data specific to the element type
-     * Override in child classes to add element-specific data
+     *
+     * Override in child classes to add element-specific data.
      *
      * @param HeadElementInterface $element
-     * @return array
+     * @return array<string, mixed>
      */
     protected function getAdditionalSerializationData(HeadElementInterface $element): array
     {

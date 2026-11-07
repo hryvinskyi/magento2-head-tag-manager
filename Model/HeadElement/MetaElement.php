@@ -13,6 +13,7 @@ class MetaElement extends AbstractHeadElement
 {
     /**
      * Render the meta element
+     *
      * @return string
      */
     public function render(): string
