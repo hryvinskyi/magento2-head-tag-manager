@@ -10,8 +10,7 @@ declare(strict_types=1);
 namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement;
 
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElement;
-use Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement\Fixture\RealAttributeRenderer;
-use Magento\Framework\View\Helper\SecureHtmlRenderer;
+use Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement\Fixture\ElementServices;
 use PHPUnit\Framework\TestCase;
 
 class MetaElementTest extends TestCase
@@ -23,10 +22,7 @@ class MetaElementTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->metaElement = new MetaElement(
-            $this->createMock(SecureHtmlRenderer::class),
-            (new RealAttributeRenderer())->build()
-        );
+        $this->metaElement = new MetaElement((new ElementServices())->attributeRenderer());
     }
 
     public function testRendersMetaElementWithAttributes(): void

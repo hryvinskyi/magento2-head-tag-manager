@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -11,213 +11,163 @@ namespace Hryvinskyi\HeadTagManager\Test\Unit\Plugin\Framework\Controller;
 
 use Hryvinskyi\HeadTagManager\Api\HeadTagManagerInterface;
 use Hryvinskyi\HeadTagManager\Plugin\Framework\Controller\Result;
-use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\App\Response\Http as HttpResponse;
-use Magento\PageCache\Model\Config;
+use Magento\Framework\App\Response\HttpInterface;
+use Magento\Framework\App\ResponseInterface;
+use Magento\Framework\Controller\ResultInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-/**
- * Test for Result plugin
- */
 class ResultTest extends TestCase
 {
+    private const PLACEHOLDER = '<!-- {{HRYVINSKYI:PLACEHOLDER:HEAD_ADDITIONAL}} -->';
+    private const PAGE = '<!DOCTYPE html><html><head>' . self::PLACEHOLDER . '</head><body></body></html>';
+    private const EMPTY_HEAD_PAGE = '<!DOCTYPE html><html><head></head><body></body></html>';
+
+    /**
+     * @var Result
+     */
     private Result $plugin;
-    private HeadTagManagerInterface|MockObject $headTagManagerMock;
-    private LoggerInterface|MockObject $loggerMock;
-    private ResultInterface|MockObject $resultMock;
-    private HttpResponse|MockObject $responseMock;
+
+    /**
+     * @var HeadTagManagerInterface&MockObject
+     */
+    private MockObject $headTagManager;
+
+    /**
+     * @var LoggerInterface&MockObject
+     */
+    private MockObject $logger;
+
+    /**
+     * @var ResultInterface&MockObject
+     */
+    private MockObject $result;
+
+    /**
+     * @var HttpResponse&MockObject
+     */
+    private MockObject $response;
+
+    /**
+     * @var string|null the content the plugin wrote into the response, null while it wrote nothing
+     */
+    private ?string $writtenContent = null;
 
     protected function setUp(): void
     {
-        $this->headTagManagerMock = $this->createMock(HeadTagManagerInterface::class);
-        $this->loggerMock = $this->createMock(LoggerInterface::class);
-        $this->resultMock = $this->createMock(ResultInterface::class);
-        $this->responseMock = $this->createMock(HttpResponse::class);
+        $this->headTagManager = $this->createMock(HeadTagManagerInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->result = $this->createMock(ResultInterface::class);
+        $this->response = $this->createMock(HttpResponse::class);
+        $this->response->method('setContent')->willReturnCallback(function (string $content): HttpResponse {
+            $this->writtenContent = $content;
 
-        $this->plugin = new Result(
-            $this->headTagManagerMock,
-            $this->loggerMock
+            return $this->response;
+        });
+
+        $this->plugin = new Result($this->headTagManager, $this->logger);
+    }
+
+    public function testSkipsAnEmptyResponse(): void
+    {
+        $this->response->method('getContent')->willReturn('');
+        $this->headTagManager->expects($this->never())->method('render');
+
+        $this->assertSame($this->result, $this->afterRenderResult());
+        $this->assertNull($this->writtenContent);
+    }
+
+    public function testSkipsANonHtmlResponse(): void
+    {
+        $this->response->method('getContent')->willReturn('{"status": "success"}');
+        $this->headTagManager->expects($this->never())->method('render');
+
+        $this->assertSame($this->result, $this->afterRenderResult());
+        $this->assertNull($this->writtenContent);
+    }
+
+    public function testInjectsTheHeadTagsInPlaceOfThePlaceholder(): void
+    {
+        $this->response->method('getContent')->willReturn(self::PAGE);
+        $this->headTagManager->method('render')->willReturn('<meta name="test" content="value">');
+
+        $this->assertSame($this->result, $this->afterRenderResult());
+        $this->assertSame(
+            '<!DOCTYPE html><html><head><meta name="test" content="value"></head><body></body></html>',
+            $this->writtenContent
         );
     }
 
-    /**
-     * Test that empty responses are skipped
-     */
-    public function testAfterRenderResultSkipsEmptyResponse(): void
+    public function testLeavesAResponseWithoutThePlaceholderUntouched(): void
     {
-        $this->responseMock->expects($this->once())
-            ->method('getContent')
-            ->willReturn('');
+        $this->response->method('getContent')->willReturn(self::EMPTY_HEAD_PAGE);
+        $this->headTagManager->expects($this->never())->method('render');
 
-        $this->loggerMock->expects($this->once())
-            ->method('debug')
-            ->with('Skipping head tag injection for empty response');
-
-        $this->headTagManagerMock->expects($this->never())
-            ->method('render');
-
-        $result = $this->plugin->afterRenderResult(
-            $this->resultMock,
-            $this->resultMock,
-            $this->responseMock
-        );
-
-        $this->assertSame($this->resultMock, $result);
+        $this->assertSame($this->result, $this->afterRenderResult());
+        $this->assertNull($this->writtenContent);
     }
 
     /**
-     * Test that non-HTML responses are skipped
+     * With nothing to inject the placeholder is still removed, so the page (and its cached copy) never shows it
      */
-    public function testAfterRenderResultSkipsNonHtmlResponse(): void
+    public function testRemovesThePlaceholderWhenThereIsNothingToInject(): void
     {
-        $this->responseMock->expects($this->once())
-            ->method('getContent')
-            ->willReturn('{"status": "success"}'); // JSON response
+        $this->response->method('getContent')->willReturn(self::PAGE);
+        $this->headTagManager->method('render')->willReturn('');
 
-        $this->loggerMock->expects($this->once())
-            ->method('debug')
-            ->with('Skipping head tag injection for non-HTML response');
-
-        $this->headTagManagerMock->expects($this->never())
-            ->method('render');
-
-        $result = $this->plugin->afterRenderResult(
-            $this->resultMock,
-            $this->resultMock,
-            $this->responseMock
-        );
-
-        $this->assertSame($this->resultMock, $result);
+        $this->assertSame($this->result, $this->afterRenderResult());
+        $this->assertSame(self::EMPTY_HEAD_PAGE, $this->writtenContent);
     }
 
     /**
-     * Test successful head tag injection
+     * A failure while rendering is logged and the placeholder is removed all the same
      */
-    public function testAfterRenderResultInjectsHeadTags(): void
+    public function testRemovesThePlaceholderWhenRenderingFails(): void
     {
-        $originalContent = '<!DOCTYPE html><html><head><!-- {{HRYVINSKYI:PLACEHOLDER:HEAD_ADDITIONAL}} --></head><body></body></html>';
-        $headContent = '<meta name="test" content="value">';
-        $expectedContent = '<!DOCTYPE html><html><head><meta name="test" content="value"></head><body></body></html>';
-
-        $this->responseMock->expects($this->exactly(2))
-            ->method('getContent')
-            ->willReturn($originalContent);
-
-        $this->responseMock->expects($this->once())
-            ->method('setContent')
-            ->with($expectedContent);
-
-        $this->headTagManagerMock->expects($this->once())
-            ->method('render')
-            ->willReturn($headContent);
-
-        $this->loggerMock->expects($this->once())
-            ->method('debug')
+        $failure = new \RuntimeException('render failed');
+        $this->response->method('getContent')->willReturn(self::PAGE);
+        $this->headTagManager->method('render')->willThrowException($failure);
+        $this->logger->expects($this->once())
+            ->method('error')
             ->with(
-                'Head tags successfully injected into result response',
-                ['tags_count' => 1]
+                $this->stringContains('render failed'),
+                $this->callback(static fn (array $context): bool => $context['exception'] === $failure)
             );
 
-        $result = $this->plugin->afterRenderResult(
-            $this->resultMock,
-            $this->resultMock,
-            $this->responseMock
-        );
+        $this->assertSame($this->result, $this->afterRenderResult());
+        $this->assertSame(self::EMPTY_HEAD_PAGE, $this->writtenContent);
+    }
 
-        $this->assertSame($this->resultMock, $result);
+    public function testSkipsAConfiguredResponseClass(): void
+    {
+        $plugin = new Result($this->headTagManager, $this->logger, ['http' => HttpInterface::class]);
+        $this->response->method('getContent')->willReturn(self::PAGE);
+        $this->headTagManager->expects($this->never())->method('render');
+
+        $this->assertSame($this->result, $plugin->afterRenderResult($this->result, $this->result, $this->response));
+        $this->assertNull($this->writtenContent);
     }
 
     /**
-     * Test that responses without placeholder are skipped
+     * A response that is not an HTTP response has no body to inject into and is passed through
      */
-    public function testAfterRenderResultSkipsResponseWithoutPlaceholder(): void
+    public function testPassesThroughAResponseThatIsNotHttp(): void
     {
-        $contentWithoutPlaceholder = '<!DOCTYPE html><html><head></head><body></body></html>';
+        $response = $this->createMock(ResponseInterface::class);
+        $this->headTagManager->expects($this->never())->method('render');
 
-        $this->responseMock->expects($this->exactly(2))
-            ->method('getContent')
-            ->willReturn($contentWithoutPlaceholder);
-
-        $this->responseMock->expects($this->never())
-            ->method('setContent');
-
-        $this->headTagManagerMock->expects($this->never())
-            ->method('render');
-
-        $this->loggerMock->expects($this->once())
-            ->method('debug')
-            ->with('Head placeholder not found in response content');
-
-        $result = $this->plugin->afterRenderResult(
-            $this->resultMock,
-            $this->resultMock,
-            $this->responseMock
-        );
-
-        $this->assertSame($this->resultMock, $result);
+        $this->assertSame($this->result, $this->plugin->afterRenderResult($this->result, $this->result, $response));
     }
 
     /**
-     * Test that responses with empty head content are skipped
+     * Runs the plugin on the HTTP response double
+     *
+     * @return ResultInterface
      */
-    public function testAfterRenderResultSkipsEmptyHeadContent(): void
+    private function afterRenderResult(): ResultInterface
     {
-        $originalContent = '<!DOCTYPE html><html><head><!-- {{HRYVINSKYI:PLACEHOLDER:HEAD_ADDITIONAL}} --></head><body></body></html>';
-
-        $this->responseMock->expects($this->exactly(2))
-            ->method('getContent')
-            ->willReturn($originalContent);
-
-        $this->responseMock->expects($this->never())
-            ->method('setContent');
-
-        $this->headTagManagerMock->expects($this->once())
-            ->method('render')
-            ->willReturn(''); // Empty head content
-
-        $this->loggerMock->expects($this->once())
-            ->method('debug')
-            ->with('No head tags to inject');
-
-        $result = $this->plugin->afterRenderResult(
-            $this->resultMock,
-            $this->resultMock,
-            $this->responseMock
-        );
-
-        $this->assertSame($this->resultMock, $result);
-    }
-
-    /**
-     * Test skip classes configuration
-     */
-    public function testAfterRenderResultSkipsConfiguredClasses(): void
-    {
-        // Create plugin with skip classes
-        $pluginWithSkipClasses = new Result(
-            $this->headTagManagerMock,
-            $this->loggerMock,
-            ['Magento\Framework\App\Response\Http']
-        );
-
-        $this->loggerMock->expects($this->once())
-            ->method('debug')
-            ->with(
-                'Skipping head tag injection for class: ' . get_class($this->responseMock),
-                ['skip_class' => 'Magento\Framework\App\Response\Http']
-            );
-
-        $this->headTagManagerMock->expects($this->never())
-            ->method('render');
-
-        $result = $pluginWithSkipClasses->afterRenderResult(
-            $this->resultMock,
-            $this->resultMock,
-            $this->responseMock
-        );
-
-        $this->assertSame($this->resultMock, $result);
+        return $this->plugin->afterRenderResult($this->result, $this->result, $this->response);
     }
 }

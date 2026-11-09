@@ -9,25 +9,12 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement;
 
-use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
 use Hryvinskyi\Base\Exception\InvalidParamException;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\AbstractHeadElement;
-use Magento\Framework\View\Helper\SecureHtmlRenderer;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class AbstractHeadElementTest extends TestCase
 {
-    /**
-     * @var SecureHtmlRenderer&MockObject
-     */
-    private MockObject $secureHtmlRenderer;
-
-    /**
-     * @var AttributeRendererInterface&MockObject
-     */
-    private MockObject $attributeRenderer;
-
     /**
      * @var AbstractHeadElement
      */
@@ -35,53 +22,190 @@ class AbstractHeadElementTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $this->attributeRenderer = $this->createMock(AttributeRendererInterface::class);
         $this->abstractHeadElement = $this->element();
     }
 
     /**
-     * Builds the smallest concrete element, the way a third party extends the abstract class.
+     * Builds the smallest concrete element, the way a third party extends the abstract class: the base class takes
+     * no renderer, so the element writes its text attributes itself
      *
-     * @param array<string, string> $attributes
+     * @param array<string, string|int|float|bool|\Stringable|array<mixed>|null> $attributes
      * @param int $sortOrder
      * @return AbstractHeadElement
      */
     private function element(array $attributes = [], int $sortOrder = 100): AbstractHeadElement
     {
-        return new class (
-            $this->secureHtmlRenderer,
-            $this->attributeRenderer,
-            $attributes,
-            $sortOrder
-        ) extends AbstractHeadElement {
+        return new class ($attributes, $sortOrder) extends AbstractHeadElement {
             /**
              * @inheritDoc
              */
             public function render(): string
             {
-                return '<element' . $this->attributesToString() . '>';
+                $html = '<element';
+                foreach ($this->getTextAttributes() as $name => $text) {
+                    $html .= ' ' . $name . '="' . $text . '"';
+                }
+
+                return $html . '>';
             }
         };
     }
 
-    public function testRendersItsAttributesThroughTheAttributeRenderer(): void
+    /**
+     * `false` and `null` leave the attribute out, `true` gives an empty value, numbers and `Stringable`s their text,
+     * in the order the attributes were set
+     */
+    public function testTextAttributesFollowOneRuleForEveryValueType(): void
     {
-        $this->attributeRenderer->expects($this->once())
-            ->method('render')
-            ->with(['id' => 'test-id'])
-            ->willReturn(' id="test-id"');
+        $element = $this->element([
+            'id' => 'test-id',
+            'hidden' => false,
+            'title' => null,
+            'async' => true,
+            'data-retries' => 3,
+            'data-ratio' => 1.5,
+            'data-label' => new class implements \Stringable {
+                /**
+                 * @inheritDoc
+                 */
+                public function __toString(): string
+                {
+                    return 'label';
+                }
+            },
+        ]);
 
-        $this->assertSame('<element id="test-id">', $this->element(['id' => 'test-id'])->render());
+        $this->assertSame(
+            '<element id="test-id" async="" data-retries="3" data-ratio="1.5" data-label="label">',
+            $element->render()
+        );
     }
 
-    public function testAnAttributeWithoutATextFormFailsAsTheRendererReportsIt(): void
+    /**
+     * An array has no text form, and neither has a value no static type reaches, as the object manager passes it
+     * from configuration
+     */
+    public function testAnAttributeWithoutATextFormFailsToBecomeText(): void
     {
-        $this->attributeRenderer->method('render')->willThrowException(new InvalidParamException('no text form'));
+        $element = $this->element();
+        $attributes = new \ReflectionProperty(AbstractHeadElement::class, 'attributes');
+        $attributes->setValue($element, ['data' => [new \stdClass()]]);
 
         $this->expectException(InvalidParamException::class);
 
-        $this->abstractHeadElement->render();
+        $element->render();
+    }
+
+    public function testConstructorTakesAttributesAndSortOrder(): void
+    {
+        $element = $this->element(['id' => 'test-id'], 42);
+
+        $this->assertSame(['id' => 'test-id'], $element->getAttributes());
+        $this->assertSame(42, $element->getSortOrder());
+    }
+
+    /**
+     * Names passed to the constructor follow the setter: they are stored in lower case, so the lookups find them
+     */
+    public function testConstructorStoresAttributeNamesInLowerCase(): void
+    {
+        $element = $this->element(['HREF' => '/a.css', 'REL' => 'stylesheet']);
+
+        $this->assertSame(['href' => '/a.css', 'rel' => 'stylesheet'], $element->getAttributes());
+        $this->assertSame('/a.css', $element->getAttribute('href'));
+        $this->assertTrue($element->hasAttribute('rel'));
+    }
+
+    /**
+     * A URL counts as remote exactly when the content security processor reads a host from it: a lower-case
+     * `http://` or `https://`, optional user information, a host, an optional port it accepts, then a path, a query,
+     * a fragment or the end
+     *
+     * @dataProvider remoteUrlProvider
+     * @param string $url the URL checked
+     * @param bool $expected whether the processor reads a host from it
+     */
+    public function testRecognisesTheUrlsTheProcessorReadsAHostFrom(string $url, bool $expected): void
+    {
+        $element = new class extends AbstractHeadElement {
+            /**
+             * @inheritDoc
+             */
+            public function render(): string
+            {
+                return '';
+            }
+
+            /**
+             * Expose the check to the test
+             *
+             * @param string $url
+             * @return bool
+             */
+            public function isRemote(string $url): bool
+            {
+                return $this->pointsAtARemoteHost($url);
+            }
+        };
+
+        $this->assertSame($expected, $element->isRemote($url));
+    }
+
+    /**
+     * URLs and whether the processor reads a host from them
+     *
+     * @return array<string, array{0: string, 1: bool}>
+     */
+    public static function remoteUrlProvider(): array
+    {
+        return [
+            'https with a path' => ['https://cdn.example.com/a.css', true],
+            'http, host only' => ['http://cdn.example.com', true],
+            'host and a slash' => ['http://cdn.example.com/', true],
+            'host and a query' => ['https://cdn.example.com?v=1', true],
+            'host and a fragment' => ['https://cdn.example.com#top', true],
+            'user information' => ['https://user:secret@cdn.example.com/a.css', true],
+            'user and a port, no path' => ['https://user@cdn.example.com:80', true],
+            'the highest port' => ['https://cdn.example.com:65535/a.css', true],
+            'port zero' => ['https://cdn.example.com:0/a.css', true],
+            'relative' => ['/media/js/x.js', false],
+            'protocol-relative' => ['//cdn.example.com/x.js', false],
+            'upper-case scheme' => ['HTTPS://cdn.example.com/x.js', false],
+            'mixed-case scheme' => ['Https://cdn.example.com/x.js', false],
+            'other scheme' => ['ftp://cdn.example.com/x.js', false],
+            'empty' => ['', false],
+            'empty host' => ['https:///a.css', false],
+            'query right after the scheme' => ['https://?a.css', false],
+            'host starting with a port' => ['https://:443/a.css', false],
+            'empty host after user information' => ['https://@/a.css', false],
+            'port of six digits' => ['https://cdn.example.com:999999/', false],
+            'port above the highest' => ['https://cdn.example.com:99999/', false],
+            'port with a letter' => ['https://cdn.example.com:8a/', false],
+            'one slash' => ['https:/cdn.example.com/a', false],
+            'space in the host' => ['https://cdn example.com/a', false],
+            'trailing line break' => ["https://cdn.example.com\n", false],
+        ];
+    }
+
+    public function testGetAttributeReturnsANonStringValueAsItWasSet(): void
+    {
+        $this->abstractHeadElement->setAttribute('crossorigin', true);
+        $this->abstractHeadElement->setAttribute('data-retries', 3);
+
+        $this->assertTrue($this->abstractHeadElement->getAttribute('crossorigin'));
+        $this->assertSame(3, $this->abstractHeadElement->getAttribute('data-retries'));
+    }
+
+    public function testAttributeNamesAreStoredInLowerCase(): void
+    {
+        $this->abstractHeadElement->setAttributes(['SRC' => '/a.js', 'Data-Id' => '7']);
+
+        $this->assertSame(['src' => '/a.js', 'data-id' => '7'], $this->abstractHeadElement->getAttributes());
+        $this->assertSame('/a.js', $this->abstractHeadElement->getAttribute('Src'));
+        $this->assertTrue($this->abstractHeadElement->hasAttribute('DATA-ID'));
+
+        $this->abstractHeadElement->removeAttribute('SRC');
+        $this->assertFalse($this->abstractHeadElement->hasAttribute('src'));
     }
 
     public function testCanSetAndGetAttribute(): void
@@ -137,11 +261,6 @@ class AbstractHeadElementTest extends TestCase
         $this->assertEquals($attributes, $this->abstractHeadElement->getAttributes());
     }
 
-    public function testCanGetSecureHtmlRenderer(): void
-    {
-        $this->assertSame($this->secureHtmlRenderer, $this->abstractHeadElement->getSecureHtmlRenderer());
-    }
-
     public function testDefaultSortOrderIs100(): void
     {
         $this->assertEquals(100, $this->abstractHeadElement->getSortOrder());
@@ -157,10 +276,5 @@ class AbstractHeadElementTest extends TestCase
     {
         $result = $this->abstractHeadElement->setSortOrder(25);
         $this->assertSame($this->abstractHeadElement, $result);
-    }
-
-    public function testConstructorAcceptsSortOrder(): void
-    {
-        $this->assertEquals(42, $this->element([], 42)->getSortOrder());
     }
 }

@@ -8,7 +8,7 @@ This module provides a robust solution for managing HTML head elements in Adobe 
 This module allows you to dynamically add, modify, and render various HTML head elements like meta tags, stylesheets, scripts, and other elements.
 
 ### Features:
-- **CSP Compatible**: Full support for Magento Content Security Policy
+- **CSP Compatible**: scripts and inline styles render through Magento's secure renderer, which adds the nonce or hash and whitelists a script's remote host. So does a remote stylesheet, which puts its host into `style-src`; see [Content Security Policy](#content-security-policy)
 - **Performance Optimized**: Efficient element management and rendering
 
 ### Key Features
@@ -79,7 +79,7 @@ $headTagManagerViewModel->getManager()->addLink([
     'href' => 'https://fonts.googleapis.com/',
 ]);
 
-// Add stylesheets (CSP compatible)
+// Add stylesheets (the host of a remote one reaches the CSP's style-src)
 $headManager->addStylesheet($block->getViewFileUrl('css/some-custom.css'));
 
 // Add external scripts (CSP compatible)
@@ -89,14 +89,34 @@ $headManager->addExternalScript($block->getViewFileUrl('js/some-custom.js'));
 $headManager->addInlineScript('console.log("Hello, world!");');
 
 // Add inline styles (CSP compatible)
-$headManager->addStyle('body { background-color: #f0f0f0; }');
+$headManager->addInlineStyle('body { background-color: #f0f0f0; }');
 ```
 
 ## Architecture
 
 ### Cache Strategy
 
-This module is not recommended for use on cached blocks, but this module provides a cache-aware architecture to handle head elements on cached blocks, and correctly render them.
+A block's head elements are stored inside the block's own block HTML cache entry, so they come back with its HTML when the block is served from the cache and its code does not run.
+
+When a cacheable block renders, the elements it adds (nested blocks included) are appended to its HTML as one comment: `<!--hryvinskyi-head-elements:1:`, a 128-bit HMAC of the payload made with the installation's crypt key, `:`, the base64 of their JSON, and `-->`. The JSON names each element's type (`short_type`), and its class only when that type would not find the same factory. The comment is written even when the block added no elements, and an element whose data cannot be stored is left out of it with a warning. Magento's own save action stores the entry under its cache lock, with the block's key, tags and lifetime. There is no second entry that could go missing, be evicted on its own, or be written after another request has read the HTML.
+
+On a hit the comment is cut off the HTML and the elements go back into the manager. Elements that `_afterToHtml()` adds are added on a hit and on a miss alike, and are never stored.
+
+An entry without a valid comment (written by 3.x, while the module was disabled, or ending with text that only looks like the comment) counts as a miss. The block renders again under the lock and the entry is rewritten, so such an entry is never served without its elements and upgrading needs no flush.
+
+A `before` plugin on `Magento\Framework\Cache\LockGuardedCacheLoader::lockedLoadData()` does this. It is declared in the global `etc/di.xml` and runs in every area, so a block rendered outside the storefront (in an e-mail sent by cron, for instance) strips the comment too. The same loader serves the configuration cache, so the plugin touches only a load whose lock name is a block cache key: it starts with one of the prefixes in the plugin's `blockCacheKeyPrefixes` argument, which lists the framework's `BLOCK_` and `CUSTOM_BLOCK_` and the CMS module's `CMS_BLOCK` prefixes. A module whose block class defines its own `CACHE_KEY_PREFIX` adds it as an item of that argument in its `di.xml`. A block loads through it when the `block_html` cache type is enabled and the block's cache lifetime is not null; while the cache type is disabled nothing is stored or restored. A lifetime of `0` or `false` also loads through it: the comment is built and Magento then saves nothing, so such a block is better given a null lifetime.
+
+If the module is removed or disabled without `bin/magento module:disable`, which cleans the caches, clean the `block_html` cache yourself. Otherwise the comment keeps printing in cached block output until the entries expire. It is an HTML comment, so the page shows nothing.
+
+An element that fails to render is logged with its key and left out; the rest of the head still renders.
+
+Attribute values: `true` renders the boolean form, `false` and `null` leave the attribute out, numbers and `Stringable` objects render as text. Arrays render on meta and on a link or an external script written as text (data and class forms); an inline script or a style refuses them. A remote link or script with an array attribute is written as text, so its host has to be in a `csp_whitelist.xml`.
+
+### Content Security Policy
+
+Inline scripts, styles and a script whose `src` points at a remote host render through Magento's secure renderer; a script with no content and a relative, protocol-relative or upper-case-scheme `src` is written as text, because the policy's processor would throw on it. So does a link that loads a remote stylesheet render through the secure renderer: its `rel` has the token `stylesheet`, or `preload` with `as="style"`, and its `href` starts with a lower-case `http://` or `https://` and a host. When Magento's Content Security Policy module is enabled, its processor adds that host to `style-src`. The tag comes out as the renderer writes it, for example `<link href="https://fonts.example.com/a.css" rel="stylesheet" />`, and a `true` attribute prints as `crossorigin=""`.
+
+Every other link is written as text and adds nothing to the policy: preloads of fonts and scripts, icons, preconnect and prefetch links, a relative or protocol-relative `href`, an upper-case scheme (`HTTPS://…`), an empty host, and any link with an array attribute. A host such a link needs has to be in a `csp_whitelist.xml`. A relative `href` or an upper-case scheme stays a text link on purpose: the policy's processor throws on it, which would drop the stylesheet from the page.
 
 ### Common Methods
 
@@ -111,12 +131,12 @@ This module is not recommended for use on cached blocks, but this module provide
 ### Element Sort Order
 
 You can control the rendering order of head elements using the `sort_order` parameter.
-Elements are sorted in ascending order (lower values render first). The default sort order is 100 for all elements.
+Elements are sorted in ascending order (lower values render first). The default sort order is 10 for inline styles and 100 for every other element.
 
 ```php
 // Critical scripts should load first (sort_order = 1)
 $headManager->createElement('script', [
-    'attributes' => ['src' => 'critical.js'],
+    'attributes' => ['src' => $block->getViewFileUrl('js/critical.js')],
     'sort_order' => 1
 ]);
 
@@ -127,11 +147,11 @@ $headManager->createElement('meta', [
 ]);
 
 // Regular stylesheet uses default sort_order (100)
-$headManager->addStylesheet('styles.css');
+$headManager->addStylesheet($block->getViewFileUrl('css/styles.css'));
 
 // Deferred scripts load later (sort_order = 200)
 $headManager->createElement('script', [
-    'attributes' => ['src' => 'analytics.js', 'defer' => 'defer'],
+    'attributes' => ['src' => $block->getViewFileUrl('js/analytics.js'), 'defer' => true],
     'sort_order' => 200
 ]);
 ```
@@ -144,49 +164,42 @@ Elements with the same sort order maintain their insertion order (stable sort).
 
 To add support for a new head element type:
 
-1. **Create Element Class**: Implement `HeadElementInterface`, or extend `AbstractHeadElement`, whose constructor takes `SecureHtmlRenderer` and `AttributeRendererInterface` before `$attributes`
-2. **Create Factory**: Extend `AbstractHeadElementFactory`
-3. **Create Strategy**: Implement `HeadElementSerializationStrategyInterface`
-4. **Register via DI**: Add to `di.xml` configuration
+1. **Create Element Class**: extend `AbstractHeadElement`. Its constructor takes `$attributes` and `$sortOrder` and no renderer; take the renderer your element writes its tag with (`AttributeRendererInterface` for a tag written as text, `SecureHtmlRenderer` for a tag that carries a nonce or hash) and pass the rest on
+2. **Create Factory**: extend `AbstractHeadElementFactory`; it creates the element through Magento's generated factory with no data, then applies attributes and sort order through the element's setters
+3. **Create Strategy**: extend `AbstractSerializationStrategy`, so the element survives the block cache
+4. **Register via DI**: add both to `di.xml`
 
 ### Example Custom Element
 
 ```php
-class CustomElement implements HeadElementInterface
+class CustomElement extends AbstractHeadElement
 {
-    private array $attributes;
-    private string $content;
-    private int $sortOrder;
+    private ?string $content = null;
 
-    public function __construct(array $attributes, string $content, int $sortOrder = 100)
+    public function __construct(
+        private readonly AttributeRendererInterface $attributeRenderer,
+        array $attributes = [],
+        int $sortOrder = 100
+    ) {
+        parent::__construct($attributes, $sortOrder);
+    }
+
+    public function setContent(string $content): self
     {
-        $this->attributes = $attributes;
         $this->content = $content;
-        $this->sortOrder = $sortOrder;
+        return $this;
     }
 
-    public function getAttributes(): array
-    {
-        return $this->attributes;
-    }
-
-    public function getContent(): string
+    public function getContent(): ?string
     {
         return $this->content;
     }
 
-    public function getSortOrder(): int
-    {
-        return $this->sortOrder;
-    }
-
     public function render(): string
     {
-        $attributes = '';
-        foreach ($this->attributes as $key => $value) {
-            $attributes .= sprintf(' %s="%s"', htmlspecialchars($key), htmlspecialchars($value));
-        }
-        return sprintf('<custom-element%s>%s</custom-element>', $attributes, htmlspecialchars($this->content));
+        return '<custom-element' . $this->attributeRenderer->render($this->getAttributes()) . '>'
+            . htmlspecialchars((string) $this->content, ENT_QUOTES)
+            . '</custom-element>';
     }
 }
 ```
@@ -204,30 +217,26 @@ class CustomElementFactory extends AbstractHeadElementFactory
     ) {
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function create(array $data = []): HeadElementInterface
+    protected function createElement(array $data): AbstractHeadElement
     {
-        // The generated factory's keys are the constructor's parameter names
-        return $this->elementFactory->create([
-            'attributes' => $data['attributes'] ?? [],
-            'content' => $data['content'] ?? '',
-            'sortOrder' => $data['sort_order'] ?? 100,
-        ]);
+        $element = $this->elementFactory->create();
+        if (isset($data['content'])) {
+            $element->setContent($data['content']);
+        }
+
+        return $element;
     }
 
-    /**
-     * @inheritDoc
-     */
+    protected function getDefaultSortOrder(): int
+    {
+        return 100;
+    }
+
     public function getElementType(): string
     {
         return 'custom';
     }
 
-    /**
-     * @inheritDoc
-     */
     public function getElementClassName(): string
     {
         return CustomElement::class;
@@ -236,26 +245,28 @@ class CustomElementFactory extends AbstractHeadElementFactory
 ```
 
 ### Custom Serialization Strategy
-```php
-class CustomElementSerializationStrategy implements HeadElementSerializationStrategyInterface
-{
-    public function serialize(HeadElementInterface $element, string $key): array
-    {
-        return [
-            'type' => get_class($element),
-            'short_type' => $this->getElementType(),
-            'attributes' => $element->getAttributes(),
-            'sort_order' => $element->getSortOrder(),
-            'content' => $element->getContent()
-        ];
-    }
 
+```php
+class CustomElementSerializationStrategy extends AbstractSerializationStrategy
+{
     public function getElementType(): string
     {
         return 'custom';
     }
+
+    public function getElementClassName(): string
+    {
+        return CustomElement::class;
+    }
+
+    protected function getAdditionalSerializationData(HeadElementInterface $element): array
+    {
+        return $element instanceof CustomElement ? ['content' => $element->getContent()] : [];
+    }
 }
 ```
+
+A strategy with a constructor of its own passes the factory registry and a `StorableAttributesInterface` on to `parent::__construct()`. When several strategies handle the same class, the one with the highest `getPriority()` is used; among equal priorities, the one registered last.
 
 ### Custom Factory Registration
 To register your custom element and factory, add the following to your `di.xml`:
@@ -287,29 +298,18 @@ $headTagManager->createElement('custom', [
 ], 'custom_key');
 ```
 
-### Element Serialization
-
-Custom serialization strategies allow for element-specific handling:
-
-```php
-class CustomElementStrategy implements HeadElementSerializationStrategyInterface
-{
-    public function serialize(HeadElementInterface $element, string $key): array
-    {
-        return [
-            'type' => get_class($element),
-            'short_type' => $this->getElementType(),
-            'attributes' => $element->getAttributes(),
-            'sort_order' => $element->getSortOrder(),
-            'content' => $this->extractContent($element)
-        ];
-    }
-}
-```
-
 ## Integration
 
-The module automatically injects head elements at the `<!-- {{HRYVINSKYI:PLACEHOLDER:HEAD_ADDITIONAL}} -->` placeholder in your HTML output.
+The module injects head elements at the `<!-- {{HRYVINSKYI:PLACEHOLDER:HEAD_ADDITIONAL}} -->` placeholder in your HTML output, and removes the placeholder when there is nothing to inject.
+
+## Upgrading from 3.x
+
+- Nothing needs flushing. The first request after the upgrade renders each cacheable block once, as after a `block_html` flush, and rewrites its entry. The separate `hhe_` entries of 3.x are no longer read and expire with the block cache.
+- A deploy whose old processes keep serving against a shared cache (an atomic release switch on a shared Redis) should run `bin/magento cache:clean block_html full_page` after the new release is active. While both versions run they overwrite each other's entries, and pages the old processes render lack the elements of cached blocks. Rolling back to 3.x needs the same clean once 3.x is active. Otherwise no flush is needed.
+- A custom element no longer receives renderers from `AbstractHeadElement`: its constructor takes only `$attributes` and `$sortOrder`, and the element takes the renderer it uses itself (see [Custom Elements](#custom-elements)). `getSecureHtmlRenderer()` and `attributesToString()` are gone.
+- The tracker, the block head element cache and the block cache detector interfaces and the two block observers are removed; the elements travel with the block's HTML now.
+- A subclass that overrides `setAttribute()`, `getAttribute()` or `setAttributes()` takes the wider value types (`string|int|float|bool|\Stringable|array|null`).
+- A custom serialization strategy with its own constructor passes a `StorableAttributesInterface` to `parent::__construct()` after the factory registry.
 
 ## Version History
 
@@ -317,16 +317,15 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history and migration note
 
 ## Testing
 
-The module includes comprehensive test coverage:
-
-- **Unit Tests**: All core classes and interfaces
-- **Integration Tests**: End-to-end functionality
-- **Cache Tests**: Cache-aware functionality
-
-Run tests with:
+Unit tests, from the Magento root:
 ```bash
-vendor/bin/phpunit vendor/hryvinskyi/magento2-head-tag-manager/Test/Unit
+vendor/bin/phpunit -c vendor/hryvinskyi/magento2-head-tag-manager/phpunit.xml.dist
 ```
+The `-c` matters: the package's bootstrap provides Magento's generated factories when the installation has not been compiled.
+
+Integration tests are in `Test/Integration`. Magento's integration configuration only collects `app/code/*/*/Test/Integration`, so for a Composer install point a copy of `dev/tests/integration/phpunit.xml` at `vendor/hryvinskyi/magento2-head-tag-manager/Test/Integration`.
+
+Static analysis runs at PHPStan level 10 with the package's `phpstan.neon.dist` from the package directory.
 
 ## Contributing
 

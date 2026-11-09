@@ -13,16 +13,18 @@ use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 
 /**
  * Strategy interface for serializing specific types of head elements
- * 
+ *
  * This interface follows the Strategy pattern, allowing different serialization
  * logic for different element types without using instanceof checks.
+ *
+ * @api
  */
 interface HeadElementSerializationStrategyInterface
 {
     /**
      * Check if this strategy can handle the given element
      *
-     * @param HeadElementInterface $element
+     * @param HeadElementInterface $element the element to check
      * @return bool
      */
     public function canHandle(HeadElementInterface $element): bool;
@@ -30,9 +32,9 @@ interface HeadElementSerializationStrategyInterface
     /**
      * Serialize the element to an array
      *
-     * @param HeadElementInterface $element
+     * @param HeadElementInterface $element the element to serialize
      * @param string $key Element key
-     * @return array Serialized element data
+     * @return array<string, mixed> Serialized element data
      */
     public function serialize(HeadElementInterface $element, string $key): array;
 
@@ -51,8 +53,10 @@ interface HeadElementSerializationStrategyInterface
     public function getElementClassName(): string;
 
     /**
-     * Get priority for this strategy (higher number = higher priority)
-     * Useful when multiple strategies can handle the same element
+     * Get priority for this strategy
+     *
+     * A higher number means a higher priority. When several strategies claim the same element class or type, the
+     * registry's lookups return the one with the highest priority.
      *
      * @return int
      */

@@ -10,14 +10,17 @@ declare(strict_types=1);
 namespace Hryvinskyi\HeadTagManager\Plugin\Framework\Controller;
 
 use Hryvinskyi\HeadTagManager\Api\HeadTagManagerInterface;
+use Magento\Framework\App\Response\Http as HttpResponse;
 use Magento\Framework\App\ResponseInterface;
 use Magento\Framework\Controller\ResultInterface;
-use Magento\Framework\App\Response\Http as HttpResponse;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Plugin for injecting head tags into Result renderResult - works before page cache
+ * Replaces the head placeholder of a rendered HTML page with the head elements, before the page cache stores the page
+ *
+ * The placeholder is always replaced, with nothing when there are no elements or rendering them failed, so neither
+ * the page nor its cached copy ever carries it.
  */
 class Result
 {
@@ -25,6 +28,11 @@ class Result
     private const HTML_TAG_PATTERN = '<html';
     private const HEAD_PLACEHOLDER = '<!-- {{HRYVINSKYI:PLACEHOLDER:HEAD_ADDITIONAL}} -->';
 
+    /**
+     * @param HeadTagManagerInterface $headTagManager renders the head elements
+     * @param LoggerInterface $logger records skipped responses and rendering failures
+     * @param array<string,class-string> $skipClasses response classes or interfaces left untouched, by item name
+     */
     public function __construct(
         private readonly HeadTagManagerInterface $headTagManager,
         private readonly LoggerInterface $logger,
@@ -33,11 +41,11 @@ class Result
     }
 
     /**
-     * Process head tag injection before result is cached
+     * Inject the head elements into the rendered HTTP response
      *
-     * @param ResultInterface $subject
+     * @param ResultInterface $subject the intercepted result; the signature of an after plugin requires it
      * @param ResultInterface $result
-     * @param HttpResponse $response
+     * @param ResponseInterface $response
      * @return ResultInterface
      */
     public function afterRenderResult(
@@ -45,29 +53,23 @@ class Result
         ResultInterface $result,
         ResponseInterface $response
     ): ResultInterface {
-        if ($this->shouldSkipProcessing($response)) {
+        if (!$response instanceof HttpResponse || $this->isClassSkipped($response)) {
             return $result;
         }
 
-        try {
-            $this->processResponse($response);
-        } catch (Throwable $e) {
-            $this->handleError($e);
+        $content = $this->htmlContent($response);
+        if ($content === null) {
+            return $result;
         }
 
-        return $result;
-    }
+        if (!str_contains($content, self::HEAD_PLACEHOLDER)) {
+            $this->logger->debug('Head placeholder not found in response content');
+            return $result;
+        }
 
-    /**
-     * Check if processing should be skipped for the given response
-     *
-     * @param HttpResponse $response
-     * @return bool
-     */
-    private function shouldSkipProcessing(HttpResponse $response): bool
-    {
-        return $this->isClassSkipped($response)
-            || !$this->isHtmlResponse($response);
+        $response->setContent(str_replace(self::HEAD_PLACEHOLDER, $this->renderHead(), $content));
+
+        return $result;
     }
 
     /**
@@ -79,7 +81,7 @@ class Result
     private function isClassSkipped(HttpResponse $response): bool
     {
         foreach ($this->skipClasses as $skipClass) {
-            if ($response instanceof $skipClass || $this->implementsInterface($response, $skipClass)) {
+            if ($response instanceof $skipClass) {
                 $this->logger->debug(
                     'Skipping head tag injection for class: ' . get_class($response),
                     ['skip_class' => $skipClass]
@@ -92,87 +94,51 @@ class Result
     }
 
     /**
-     * Check if subject implements the given interface
-     *
-     * @param object $subject
-     * @param string $interface
-     * @return bool
-     */
-    private function implementsInterface(object $subject, string $interface): bool
-    {
-        return in_array($interface, class_implements($subject) ?: [], true);
-    }
-
-    /**
-     * Validate if the response content is HTML
+     * Get the response body when it is an HTML page, or null when it is empty or not HTML
      *
      * @param HttpResponse $response
-     * @return bool
+     * @return string|null
      */
-    private function isHtmlResponse(HttpResponse $response): bool
+    private function htmlContent(HttpResponse $response): ?string
     {
         $content = $response->getContent();
 
-        if (empty($content)) {
+        if (!is_string($content) || $content === '') {
             $this->logger->debug('Skipping head tag injection for empty response');
-            return false;
+            return null;
         }
 
-        $isHtml = str_contains($content, self::HTML_DOCTYPE_PATTERN) ||
-            str_contains($content, self::HTML_TAG_PATTERN);
-
-        if (!$isHtml) {
+        if (!str_contains($content, self::HTML_DOCTYPE_PATTERN) && !str_contains($content, self::HTML_TAG_PATTERN)) {
             $this->logger->debug('Skipping head tag injection for non-HTML response');
+            return null;
         }
 
-        return $isHtml;
+        return $content;
     }
 
     /**
-     * Process the HTTP response by injecting head tags
+     * Render the head elements, or nothing when rendering fails
      *
-     * @param HttpResponse $response
-     * @return void
+     * @return string
      */
-    private function processResponse(HttpResponse $response): void
+    private function renderHead(): string
     {
-        $content = $response->getContent();
+        try {
+            $headContent = $this->headTagManager->render();
+        } catch (Throwable $exception) {
+            $this->logger->error(
+                'Error while adding head elements to Result response: ' . $exception->getMessage(),
+                ['exception' => $exception]
+            );
 
-        if (!str_contains($content, self::HEAD_PLACEHOLDER)) {
-            $this->logger->debug('Head placeholder not found in response content');
-            return;
+            return '';
         }
-
-        $headContent = $this->headTagManager->render();
-
-        if (empty($headContent)) {
-            $this->logger->debug('No head tags to inject');
-            return;
-        }
-
-        $updatedContent = str_replace(self::HEAD_PLACEHOLDER, $headContent, $content);
-        $response->setContent($updatedContent);
 
         $this->logger->debug(
-            'Head tags successfully injected into result response',
+            $headContent === '' ? 'No head tags to inject' : 'Head tags successfully injected into result response',
             ['tags_count' => substr_count($headContent, '<')]
         );
-    }
 
-    /**
-     * Handle errors that occur during processing
-     *
-     * @param Throwable $exception
-     * @return void
-     */
-    private function handleError(Throwable $exception): void
-    {
-        $this->logger->error(
-            'Error while adding head elements to Result response: ' . $exception->getMessage(),
-            [
-                'exception' => $exception,
-                'trace' => $exception->getTraceAsString()
-            ]
-        );
+        return $headContent;
     }
 }

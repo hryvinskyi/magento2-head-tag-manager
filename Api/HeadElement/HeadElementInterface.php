@@ -11,6 +11,8 @@ namespace Hryvinskyi\HeadTagManager\Api\HeadElement;
 
 /**
  * Interface for head tag elements
+ *
+ * @api
  */
 interface HeadElementInterface
 {
@@ -18,13 +20,17 @@ interface HeadElementInterface
      * Render the head element as HTML
      *
      * @return string The HTML representation of the element
+     * @throws \InvalidArgumentException When the element cannot be rendered, e.g. an attribute value has no text form
      */
     public function render(): string;
 
     /**
      * Get all attributes
      *
-     * @return array<string,string> attribute name => value
+     * `true` renders the attribute in its boolean form, `false` and `null` leave it out; whether an array renders
+     * depends on the element.
+     *
+     * @return array<string,string|int|float|bool|\Stringable|array<mixed>|null> attribute name => value
      */
     public function getAttributes(): array;
 

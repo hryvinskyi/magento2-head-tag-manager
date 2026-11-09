@@ -1,12 +1,19 @@
 {
   "name": "hryvinskyi/magento2-head-tag-manager",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "HTML head tag manager for Magento 2 advanced element management capabilities",
   "type": "magento2-module",
   "require": {
     "magento/framework": "*",
-    "magento/module-store": "*",
+    "magento/module-page-cache": "*",
+    "magento/module-cms": "*",
     "hryvinskyi/magento2-base": "^3.0"
+  },
+  "require-dev": {
+    "magento/module-csp": "*"
+  },
+  "suggest": {
+    "magento/module-csp": "Remote stylesheet hosts reach the content security policy"
   },
   "license": "MIT",
   "authors": [
@@ -16,6 +23,9 @@
     }
   ],
   "autoload": {
+    "exclude-from-classmap": [
+      "/Test/phpstan/"
+    ],
     "files": [
       "registration.php"
     ],

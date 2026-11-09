@@ -14,31 +14,34 @@ use Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface;
 
 /**
  * Registry for managing head element factories
- * 
+ *
  * This implementation provides a registry for managing different types of head element factories
  */
 class HeadElementFactoryRegistry implements HeadElementFactoryRegistryInterface
 {
     /**
      * Registry of factories by element type
-     * @var HeadElementFactoryInterface[]
+     *
+     * @var array<string, HeadElementFactoryInterface>
      */
     private array $factoriesByType = [];
 
     /**
      * Registry of factories by class name
-     * @var HeadElementFactoryInterface[]
+     *
+     * @var array<string, HeadElementFactoryInterface>
      */
     private array $factoriesByClassName = [];
 
     /**
      * Mapping of class names to element types
+     *
      * @var array<string, string>
      */
     private array $classNameToTypeMap = [];
 
     /**
-     * @param HeadElementFactoryInterface[] $factories
+     * @param array<int|string,HeadElementFactoryInterface> $factories
      */
     public function __construct(array $factories = [])
     {
@@ -95,7 +98,7 @@ class HeadElementFactoryRegistry implements HeadElementFactoryRegistryInterface
     /**
      * Check if a factory is registered for the given element type
      *
-     * @param string $elementType
+     * @param string $elementType the element type
      * @return bool
      */
     public function hasFactoryForType(string $elementType): bool
@@ -106,7 +109,7 @@ class HeadElementFactoryRegistry implements HeadElementFactoryRegistryInterface
     /**
      * Check if a factory is registered for the given class name
      *
-     * @param string $className
+     * @param string $className the element class name
      * @return bool
      */
     public function hasFactoryForClassName(string $className): bool
@@ -117,7 +120,7 @@ class HeadElementFactoryRegistry implements HeadElementFactoryRegistryInterface
     /**
      * Get all registered factories
      *
-     * @return HeadElementFactoryInterface[]
+     * @return list<HeadElementFactoryInterface>
      */
     public function getAllFactories(): array
     {

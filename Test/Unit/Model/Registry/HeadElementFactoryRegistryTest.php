@@ -15,6 +15,7 @@ use PHPUnit\Framework\TestCase;
 
 class HeadElementFactoryRegistryTest extends TestCase
 {
+    /** @var HeadElementFactoryRegistry */
     private HeadElementFactoryRegistry $registry;
 
     protected function setUp(): void

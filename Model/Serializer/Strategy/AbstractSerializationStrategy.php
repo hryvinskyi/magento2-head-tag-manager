@@ -11,6 +11,7 @@ namespace Hryvinskyi\HeadTagManager\Model\Serializer\Strategy;
 
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface;
+use Hryvinskyi\HeadTagManager\Api\Serializer\StorableAttributesInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\Strategy\HeadElementSerializationStrategyInterface;
 
 /**
@@ -20,9 +21,11 @@ abstract class AbstractSerializationStrategy implements HeadElementSerialization
 {
     /**
      * @param HeadElementFactoryRegistryInterface $factoryRegistry finds the factory that recreates an element
+     * @param StorableAttributesInterface $storableAttributes puts attribute values in a form that survives encoding
      */
     public function __construct(
-        protected readonly HeadElementFactoryRegistryInterface $factoryRegistry
+        protected readonly HeadElementFactoryRegistryInterface $factoryRegistry,
+        private readonly StorableAttributesInterface $storableAttributes
     ) {
     }
 
@@ -44,7 +47,7 @@ abstract class AbstractSerializationStrategy implements HeadElementSerialization
         $data = [
             'type' => get_class($element),
             'short_type' => $this->getElementType(),
-            'attributes' => $element->getAttributes(),
+            'attributes' => $this->storableAttributes->fromAttributes($element->getAttributes()),
             'sort_order' => $element->getSortOrder(),
         ];
 

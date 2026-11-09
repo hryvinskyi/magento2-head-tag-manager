@@ -11,18 +11,26 @@ namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\Serializer\Strategy;
 
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface;
+use Hryvinskyi\HeadTagManager\Model\Serializer\StorableAttributes;
 use Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\AbstractSerializationStrategy;
+use Hryvinskyi\HeadTagManager\Test\Unit\Model\Serializer\Stub\ConcreteSerializationStrategy;
+use Hryvinskyi\HeadTagManager\Test\Unit\Model\Serializer\Stub\ConcreteSerializationStrategyWithAdditionalData;
+use Hryvinskyi\HeadTagManager\Test\Unit\Model\Serializer\Stub\TestElement;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class AbstractSerializationStrategyTest extends TestCase
 {
+    /** @var HeadElementFactoryRegistryInterface&MockObject */
     private HeadElementFactoryRegistryInterface $factoryRegistry;
+
+    /** @var ConcreteSerializationStrategy */
     private ConcreteSerializationStrategy $strategy;
 
     protected function setUp(): void
     {
         $this->factoryRegistry = $this->createMock(HeadElementFactoryRegistryInterface::class);
-        $this->strategy = new ConcreteSerializationStrategy($this->factoryRegistry);
+        $this->strategy = new ConcreteSerializationStrategy($this->factoryRegistry, new StorableAttributes());
     }
 
     public function testCanHandleReturnsTrue(): void
@@ -35,6 +43,24 @@ class AbstractSerializationStrategyTest extends TestCase
     {
         $element = $this->createMock(HeadElementInterface::class);
         $this->assertFalse($this->strategy->canHandle($element));
+    }
+
+    public function testSerializeStoresAStringableAttributeValueAsItsText(): void
+    {
+        $element = $this->createMock(HeadElementInterface::class);
+        $element->method('getAttributes')->willReturn([
+            'href' => new class () implements \Stringable {
+                public function __toString(): string
+                {
+                    return '/styles.css';
+                }
+            },
+            'data' => ['variant' => 'hero'],
+        ]);
+
+        $data = $this->strategy->serialize($element, 'key');
+
+        $this->assertSame(['href' => '/styles.css', 'data' => ['variant' => 'hero']], $data['attributes']);
     }
 
     public function testSerializeBasicData(): void
@@ -59,7 +85,10 @@ class AbstractSerializationStrategyTest extends TestCase
         $element = new TestElement();
         $element->setAttributes(['name' => 'test']);
 
-        $strategy = new ConcreteSerializationStrategyWithAdditionalData($this->factoryRegistry);
+        $strategy = new ConcreteSerializationStrategyWithAdditionalData(
+            $this->factoryRegistry,
+            new StorableAttributes()
+        );
         $result = $strategy->serialize($element, 'test-key');
 
         $expected = [
@@ -76,92 +105,5 @@ class AbstractSerializationStrategyTest extends TestCase
     public function testGetPriorityReturnsDefaultValue(): void
     {
         $this->assertEquals(100, $this->strategy->getPriority());
-    }
-}
-
-// Test concrete implementations
-class ConcreteSerializationStrategy extends AbstractSerializationStrategy
-{
-    public function getElementType(): string
-    {
-        return 'test';
-    }
-
-    public function getElementClassName(): string
-    {
-        return TestElement::class;
-    }
-}
-
-class ConcreteSerializationStrategyWithAdditionalData extends AbstractSerializationStrategy
-{
-    public function getElementType(): string
-    {
-        return 'test';
-    }
-
-    public function getElementClassName(): string
-    {
-        return TestElement::class;
-    }
-
-    protected function getAdditionalSerializationData(HeadElementInterface $element): array
-    {
-        return ['additional' => 'data'];
-    }
-}
-
-class TestElement implements HeadElementInterface
-{
-    private array $attributes = [];
-    private int $sortOrder = 100;
-
-    public function setAttribute(string $name, string $value): self
-    {
-        $this->attributes[$name] = $value;
-        return $this;
-    }
-
-    public function setAttributes(array $attributes): self
-    {
-        $this->attributes = $attributes;
-        return $this;
-    }
-
-    public function getAttribute(string $name, ?string $default = null): ?string
-    {
-        return $this->attributes[$name] ?? $default;
-    }
-
-    public function getAttributes(): array
-    {
-        return $this->attributes;
-    }
-
-    public function hasAttribute(string $name): bool
-    {
-        return isset($this->attributes[$name]);
-    }
-
-    public function removeAttribute(string $name): self
-    {
-        unset($this->attributes[$name]);
-        return $this;
-    }
-
-    public function render(): string
-    {
-        return '<test>';
-    }
-
-    public function getSortOrder(): int
-    {
-        return $this->sortOrder;
-    }
-
-    public function setSortOrder(int $sortOrder): self
-    {
-        $this->sortOrder = $sortOrder;
-        return $this;
     }
 }

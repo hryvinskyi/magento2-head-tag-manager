@@ -12,10 +12,12 @@ namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\Serializer\Strategy;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Api\Serializer\Strategy\HeadElementSerializationStrategyInterface;
 use Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\SerializationStrategyRegistry;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class SerializationStrategyRegistryTest extends TestCase
 {
+    /** @var SerializationStrategyRegistry */
     private SerializationStrategyRegistry $registry;
 
     protected function setUp(): void
@@ -96,11 +98,12 @@ class SerializationStrategyRegistryTest extends TestCase
 
         $this->registry->registerStrategy($strategy);
 
-        // First call should invoke canHandle
-        $this->assertSame($strategy, $this->registry->getStrategyForElement($element));
-        
-        // Second call should use cached result
-        $this->assertSame($strategy, $this->registry->getStrategyForElement($element));
+        // First call should invoke canHandle; the second one uses the cached result
+        $first = $this->registry->getStrategyForElement($element);
+        $second = $this->registry->getStrategyForElement($element);
+
+        $this->assertSame($strategy, $first);
+        $this->assertSame($first, $second);
     }
 
     public function testGetAllStrategies(): void
@@ -191,6 +194,136 @@ class SerializationStrategyRegistryTest extends TestCase
         // High priority strategy should come first
         $this->assertSame($highPriorityStrategy, $strategies[0]);
         $this->assertSame($lowPriorityStrategy, $strategies[1]);
+    }
+
+    /**
+     * @return array<string, array{list<int>}> the priorities in registration order
+     */
+    public static function competingPriorities(): array
+    {
+        return [
+            'higher first' => [[200, 100]],
+            'higher last' => [[100, 200]],
+        ];
+    }
+
+    /**
+     * @param list<int> $priorities
+     * @dataProvider competingPriorities
+     */
+    public function testHigherPriorityWinsTheExactClassAndTypeLookups(array $priorities): void
+    {
+        $strategies = [];
+        foreach ($priorities as $priority) {
+            $strategies[$priority] = $this->strategyFor('MetaElement', 'meta', $priority);
+        }
+
+        $registry = new SerializationStrategyRegistry(array_values($strategies));
+
+        $this->assertSame($strategies[200], $registry->getStrategyByClassName('MetaElement'));
+        $this->assertSame($strategies[200], $registry->getStrategyByType('meta'));
+    }
+
+    /**
+     * @param list<int> $priorities
+     * @dataProvider competingPriorities
+     */
+    public function testHigherPriorityWinsWhenRegisteredAtRuntime(array $priorities): void
+    {
+        $strategies = [];
+        foreach ($priorities as $priority) {
+            $strategies[$priority] = $this->strategyFor('MetaElement', 'meta', $priority);
+            $this->registry->registerStrategy($strategies[$priority]);
+        }
+
+        $this->assertSame($strategies[200], $this->registry->getStrategyByClassName('MetaElement'));
+        $this->assertSame($strategies[200], $this->registry->getStrategyByType('meta'));
+        $this->assertSame([$strategies[200], $strategies[100]], $this->registry->getAllStrategies());
+    }
+
+    public function testEqualPriorityLetsTheLaterRegisteredWin(): void
+    {
+        $first = $this->strategyFor('MetaElement', 'meta', 100);
+        $second = $this->strategyFor('MetaElement', 'meta', 100);
+
+        $registry = new SerializationStrategyRegistry([$first, $second]);
+
+        $this->assertSame($second, $registry->getStrategyByClassName('MetaElement'));
+        $this->assertSame($second, $registry->getStrategyByType('meta'));
+    }
+
+    public function testCustomStrategyWithTheDefaultPriorityReplacesTheBuiltInOneAtRuntime(): void
+    {
+        $builtIn = $this->strategyFor('MetaElement', 'meta', 100);
+        $custom = $this->strategyFor('MetaElement', 'meta', 100);
+        $this->registry->registerStrategy($builtIn);
+
+        $this->registry->registerStrategy($custom);
+
+        $this->assertSame($custom, $this->registry->getStrategyByClassName('MetaElement'));
+        $this->assertSame($custom, $this->registry->getStrategyByType('meta'));
+    }
+
+    public function testLowerPriorityRegisteredLaterDoesNotReplaceTheStoredStrategy(): void
+    {
+        $builtIn = $this->strategyFor('MetaElement', 'meta', 100);
+        $lower = $this->strategyFor('MetaElement', 'meta', 50);
+
+        $this->registry->registerStrategy($builtIn);
+        $this->registry->registerStrategy($lower);
+
+        $this->assertSame($builtIn, $this->registry->getStrategyByClassName('MetaElement'));
+        $this->assertSame($builtIn, $this->registry->getStrategyByType('meta'));
+    }
+
+    public function testEqualPriorityLetsTheLaterRegisteredWinTheCanHandleFallback(): void
+    {
+        $element = $this->createMock(HeadElementInterface::class);
+        $first = $this->strategyFor('FirstElement', 'first', 100, true);
+        $second = $this->strategyFor('SecondElement', 'second', 100, true);
+
+        $this->registry->registerStrategy($first);
+        $this->registry->registerStrategy($second);
+
+        $this->assertSame($second, $this->registry->getStrategyForElement($element));
+        $this->assertSame([$second, $first], $this->registry->getAllStrategies());
+    }
+
+    public function testStrategyRegisteredLaterIsConsideredByTheCanHandleFallback(): void
+    {
+        $element = $this->createMock(HeadElementInterface::class);
+        $low = $this->strategyFor('LowElement', 'low', 100, true);
+        $high = $this->strategyFor('HighElement', 'high', 200, true);
+
+        $this->registry->registerStrategy($low);
+        $this->assertSame($low, $this->registry->getStrategyForElement($element));
+
+        $this->registry->registerStrategy($high);
+        $this->assertSame($high, $this->registry->getStrategyForElement($element));
+    }
+
+    /**
+     * Build a strategy double
+     *
+     * @param string $className the element class it handles
+     * @param string $type the element type it handles
+     * @param int $priority its priority
+     * @param bool $canHandle what canHandle() answers
+     * @return HeadElementSerializationStrategyInterface&MockObject
+     */
+    private function strategyFor(
+        string $className,
+        string $type,
+        int $priority,
+        bool $canHandle = false
+    ): HeadElementSerializationStrategyInterface {
+        $strategy = $this->createMock(HeadElementSerializationStrategyInterface::class);
+        $strategy->method('getElementType')->willReturn($type);
+        $strategy->method('getElementClassName')->willReturn($className);
+        $strategy->method('getPriority')->willReturn($priority);
+        $strategy->method('canHandle')->willReturn($canHandle);
+
+        return $strategy;
     }
 
     public function testGetStrategyByTypeReturnsNullForUnknownType(): void

@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
-use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElementFactory as ScriptElementObjectFactory;
 
@@ -27,18 +26,25 @@ class ScriptElementFactory extends AbstractHeadElementFactory
     }
 
     /**
-     * Create the script element
-     *
-     * @param array<string,mixed> $data the element's `attributes`, `content` and `sort_order`
-     * @return HeadElementInterface
+     * @inheritDoc
      */
-    public function create(array $data = []): HeadElementInterface
+    protected function createElement(array $data): ScriptElement
     {
-        return $this->elementFactory->create([
-            'attributes' => $data['attributes'] ?? [],
-            'content' => $data['content'] ?? null,
-            'sortOrder' => $data['sort_order'] ?? 100,
-        ]);
+        $element = $this->elementFactory->create();
+        $content = $this->getContent($data);
+        if ($content !== null) {
+            $element->setContent($content);
+        }
+
+        return $element;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function getDefaultSortOrder(): int
+    {
+        return 100;
     }
 
     /**

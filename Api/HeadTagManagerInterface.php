@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
@@ -9,16 +9,30 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Api;
 
+use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementFactoryInterface;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 
+/**
+ * Collects the elements a request adds to the HTML head and renders them in sort order
+ *
+ * An attribute value is a string, an int, a float, a bool, a \Stringable, an array or null: `true` renders the
+ * attribute in its boolean form, `false` and `null` leave it out. Only link and meta elements render an array
+ * (as data attributes, a class list, a style or JSON); a script or style element with one fails to render.
+ *
+ * @phpstan-import-type HeadElementData from HeadElementFactoryInterface
+ * @api
+ */
 interface HeadTagManagerInterface
 {
     /**
-     * Create a new head element
+     * Create a head element of a registered type and add it under a key
+     *
      * @param string $type Element type (e.g., 'meta', 'link', 'style', 'script')
-     * @param array $data Element data (attributes, content, etc.)
-     * @param string|null $key Optional key for replacing/removing element later
+     * @param HeadElementData $data Element data (attributes, content, sort order)
+     * @param string|null $key Key for replacing/removing the element later; generated from the data when null
      * @return HeadElementInterface
+     * @throws \InvalidArgumentException When no factory is registered for the type, or when no key is given and the
+     *     data cannot identify an element (an attribute value of an unsupported type, content that cannot be encoded)
      */
     public function createElement(
         string $type,
@@ -27,7 +41,8 @@ interface HeadTagManagerInterface
     ): HeadElementInterface;
 
     /**
-     * Add a head element
+     * Add a head element, replacing any element stored under the same key
+     *
      * @param HeadElementInterface $element Head element
      * @param string $key Key for replacing/removing element later
      * @return $this
@@ -36,6 +51,7 @@ interface HeadTagManagerInterface
 
     /**
      * Remove an element by key
+     *
      * @param string $key Element key
      * @return $this
      */
@@ -43,6 +59,7 @@ interface HeadTagManagerInterface
 
     /**
      * Check if element exists by key
+     *
      * @param string $key Element key
      * @return bool
      */
@@ -50,14 +67,30 @@ interface HeadTagManagerInterface
 
     /**
      * Get element by key
+     *
      * @param string $key Element key
      * @return HeadElementInterface|null
      */
     public function getElement(string $key): ?HeadElementInterface;
 
     /**
+     * Get every element added so far, keyed by element key, in insertion order
+     *
+     * @return array<string, HeadElementInterface>
+     */
+    public function getAllElements(): array;
+
+    /**
+     * Remove every element
+     *
+     * @return $this
+     */
+    public function clear(): HeadTagManagerInterface;
+
+    /**
      * Add a meta tag
-     * @param array $attributes Meta attributes
+     *
+     * @param array<string,string|int|float|bool|\Stringable|array<mixed>|null> $attributes Meta attributes
      * @param string|null $key Optional key
      * @return $this
      */
@@ -65,6 +98,7 @@ interface HeadTagManagerInterface
 
     /**
      * Add a meta tag with name and content
+     *
      * @param string $name Meta name
      * @param string $content Meta content
      * @param string|null $key Optional key
@@ -74,6 +108,7 @@ interface HeadTagManagerInterface
 
     /**
      * Add a meta tag with property and content
+     *
      * @param string $property Meta property
      * @param string $content Meta content
      * @param string|null $key Optional key
@@ -83,6 +118,7 @@ interface HeadTagManagerInterface
 
     /**
      * Add charset meta tag
+     *
      * @param string $charset Character set
      * @return $this
      */
@@ -90,7 +126,8 @@ interface HeadTagManagerInterface
 
     /**
      * Add a link element
-     * @param array $attributes Link attributes
+     *
+     * @param array<string,string|int|float|bool|\Stringable|array<mixed>|null> $attributes Link attributes
      * @param string|null $key Optional key
      * @return $this
      */
@@ -98,8 +135,9 @@ interface HeadTagManagerInterface
 
     /**
      * Add a stylesheet link
+     *
      * @param string $href URL to stylesheet
-     * @param array $attributes Additional attributes
+     * @param array<string,string|int|float|bool|\Stringable|array<mixed>|null> $attributes Additional attributes
      * @param string|null $key Optional key
      * @return $this
      */
@@ -107,8 +145,9 @@ interface HeadTagManagerInterface
 
     /**
      * Add a style element
+     *
      * @param string $content CSS content
-     * @param array $attributes Style attributes
+     * @param array<string,string|int|float|bool|\Stringable|array<mixed>|null> $attributes Style attributes
      * @param string|null $key Optional key
      * @return $this
      */
@@ -120,7 +159,8 @@ interface HeadTagManagerInterface
 
     /**
      * Add a script element
-     * @param array $attributes Script attributes
+     *
+     * @param array<string,string|int|float|bool|\Stringable|array<mixed>|null> $attributes Script attributes
      * @param string|null $content Script content
      * @param string|null $key Optional key
      * @return $this
@@ -129,8 +169,9 @@ interface HeadTagManagerInterface
 
     /**
      * Add an external script
+     *
      * @param string $src Script URL
-     * @param array $attributes Additional attributes
+     * @param array<string,string|int|float|bool|\Stringable|array<mixed>|null> $attributes Additional attributes
      * @param string|null $key Optional key
      * @return $this
      */
@@ -142,8 +183,9 @@ interface HeadTagManagerInterface
 
     /**
      * Add an inline script
+     *
      * @param string $content Script content
-     * @param array $attributes Additional attributes
+     * @param array<string,string|int|float|bool|\Stringable|array<mixed>|null> $attributes Additional attributes
      * @param string|null $key Optional key
      * @return $this
      */
@@ -154,24 +196,31 @@ interface HeadTagManagerInterface
     ): HeadTagManagerInterface;
 
     /**
-     * Render all head elements
+     * Render every element, lowest sort order first, one per line
+     *
+     * An element that fails to render is logged and left out; the others are still rendered.
+     *
      * @return string
      */
     public function render(): string;
 
     /**
-     * Get array of rendered head elements
-     * @return array
+     * Get the HTML of every element that renders, keyed by element key, in the order render() uses
+     *
+     * @return array<string, string>
      */
     public function getRenderedElements(): array;
 
     /**
-     * Generate a unique key for an element based on type and data
+     * Generate the key an element is stored under from its type and data
+     *
+     * Two spellings of the same tag yield the same key: attribute names are compared lower-cased and in
+     * name order, `null` and `false` attributes are ignored, empty content is ignored, and the sort order
+     * is not part of the identity.
      *
      * @param string $type Element type (e.g., 'meta', 'link', 'script')
-     * @param array $data Element data (attributes, content, etc.)
-     *
-     * @return string Unique key for the element
+     * @param HeadElementData $data Element data (attributes, content, sort order)
+     * @return string Key for the element
      */
     public function generateElementKey(string $type, array $data): string;
 }

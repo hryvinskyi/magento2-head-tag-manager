@@ -10,28 +10,43 @@ declare(strict_types=1);
 namespace Hryvinskyi\HeadTagManager\Model\HeadElement;
 
 use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
+use Hryvinskyi\Base\Exception\InvalidParamException;
 use Magento\Framework\View\Helper\SecureHtmlRenderer;
 
 /**
- * An inline or external script tag, rendered by the secure renderer so it can carry a content security nonce
+ * A script tag; an inline or remote script is rendered by the secure renderer, every other one is written as text
+ *
+ * The framework's secure renderer passes a tag through its security processors, so an inline script can carry a
+ * content security nonce or hash and the host of a remote `src` is added to the policy's `script-src` directive.
+ * Inline content always goes that way.
+ *
+ * A script without content is different: the content security processor throws when it can read no host from the
+ * `src` ("Either remote URL or hashable content is required"), and the head tag manager would then log the error and
+ * leave the script out of the page. So an external script reaches the secure renderer only when its `src` is one the
+ * processor reads a host from (see pointsAtARemoteHost()) and every attribute has a text form; a relative or
+ * protocol-relative `src`, an upper-case scheme, an empty host or an array attribute is written as text through the
+ * attribute renderer, with no content, and keeps its script. A script with neither content nor `src` is text too.
+ *
+ * The text path writes a `true` attribute in its bare boolean form (`defer`), the secure renderer as an empty value
+ * (`defer=""`), and the HTML renderer behind the secure renderer decides how values are escaped.
  */
 class ScriptElement extends AbstractHeadElement
 {
     /**
-     * @param SecureHtmlRenderer $secureHtmlRenderer renders the tag
-     * @param AttributeRendererInterface $attributeRenderer passed to the parent class
-     * @param array<string,string> $attributes attribute name => value
+     * @param AttributeRendererInterface $attributeRenderer writes the attributes of a script built as text
+     * @param SecureHtmlRenderer $secureHtmlRenderer renders an inline or remote script
+     * @param array<string,string|int|float|bool|\Stringable|array<mixed>|null> $attributes attribute name => value
      * @param string|null $content script content
      * @param int $sortOrder the sort order value (lower values render first)
      */
     public function __construct(
-        SecureHtmlRenderer $secureHtmlRenderer,
-        AttributeRendererInterface $attributeRenderer,
+        private readonly AttributeRendererInterface $attributeRenderer,
+        private readonly SecureHtmlRenderer $secureHtmlRenderer,
         array $attributes = [],
         private string|null $content = null,
         int $sortOrder = 100
     ) {
-        parent::__construct($secureHtmlRenderer, $attributeRenderer, $attributes, $sortOrder);
+        parent::__construct($attributes, $sortOrder);
     }
 
     /**
@@ -60,14 +75,20 @@ class ScriptElement extends AbstractHeadElement
      * Render the script element
      *
      * @return string
+     * @throws InvalidParamException when an attribute value has no text form
      */
     public function render(): string
     {
-        return $this->getSecureHtmlRenderer()->renderTag(
-            'script',
-            $this->getAttributes(),
-            $this->getContent() ?? '',
-            false,
-        );
+        $content = $this->getContent() ?? '';
+        if ($content !== '') {
+            return $this->secureHtmlRenderer->renderTag('script', $this->getTextAttributes(), $content, false);
+        }
+
+        $texts = $this->findTextAttributes();
+        if ($texts !== null && $this->pointsAtARemoteHost($texts['src'] ?? '')) {
+            return $this->secureHtmlRenderer->renderTag('script', $texts, '', false);
+        }
+
+        return '<script' . $this->attributeRenderer->render($this->getAttributes()) . '></script>';
     }
 }

@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
-use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElementFactory as StyleElementObjectFactory;
 
@@ -27,18 +26,25 @@ class StyleElementFactory extends AbstractHeadElementFactory
     }
 
     /**
-     * Create the style element
-     *
-     * @param array<string,mixed> $data the element's `attributes`, `content` and `sort_order`
-     * @return HeadElementInterface
+     * @inheritDoc
      */
-    public function create(array $data = []): HeadElementInterface
+    protected function createElement(array $data): StyleElement
     {
-        return $this->elementFactory->create([
-            'attributes' => $data['attributes'] ?? [],
-            'content' => $data['content'] ?? null,
-            'sortOrder' => $data['sort_order'] ?? 10,
-        ]);
+        $element = $this->elementFactory->create();
+        $content = $this->getContent($data);
+        if ($content !== null) {
+            $element->setContent($content);
+        }
+
+        return $element;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function getDefaultSortOrder(): int
+    {
+        return 10;
     }
 
     /**

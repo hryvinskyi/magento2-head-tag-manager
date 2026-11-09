@@ -15,34 +15,42 @@ use Hryvinskyi\HeadTagManager\Api\Serializer\Strategy\SerializationStrategyRegis
 
 /**
  * Registry for managing serialization strategies
+ *
+ * When several strategies claim the same element class or element type, the one with the highest priority is
+ * the one the lookups return; among equal priorities the one registered last wins, so a custom strategy with the
+ * default priority replaces a built-in one.
  */
 class SerializationStrategyRegistry implements SerializationStrategyRegistryInterface
 {
     /**
-     * @var HeadElementSerializationStrategyInterface[]
+     * @var array<string, HeadElementSerializationStrategyInterface>
      */
     private array $strategiesByType = [];
 
     /**
-     * @var HeadElementSerializationStrategyInterface[]
+     * @var array<string, HeadElementSerializationStrategyInterface>
      */
     private array $strategiesByClassName = [];
 
     /**
-     * @var HeadElementSerializationStrategyInterface[]
+     * Every registered strategy, highest priority first
+     *
+     * @var list<HeadElementSerializationStrategyInterface>
      */
     private array $allStrategies = [];
 
     /**
-     * @param HeadElementSerializationStrategyInterface[] $strategies
+     * Strategies found through canHandle(), by the class of the element they were asked about
+     *
+     * @var array<string, HeadElementSerializationStrategyInterface>
+     */
+    private array $resolvedByElementClass = [];
+
+    /**
+     * @param array<int|string,HeadElementSerializationStrategyInterface> $strategies
      */
     public function __construct(array $strategies = [])
     {
-        // Sort strategies by priority (highest first)
-        usort($strategies, static function ($a, $b) {
-            return $b->getPriority() <=> $a->getPriority();
-        });
-
         foreach ($strategies as $strategy) {
             $this->registerStrategy($strategy);
         }
@@ -56,9 +64,23 @@ class SerializationStrategyRegistry implements SerializationStrategyRegistryInte
         $elementType = $strategy->getElementType();
         $className = $strategy->getElementClassName();
 
-        $this->strategiesByType[$elementType] = $strategy;
-        $this->strategiesByClassName[$className] = $strategy;
-        $this->allStrategies[] = $strategy;
+        if ($this->outranks($strategy, $this->strategiesByType[$elementType] ?? null)) {
+            $this->strategiesByType[$elementType] = $strategy;
+        }
+        if ($this->outranks($strategy, $this->strategiesByClassName[$className] ?? null)) {
+            $this->strategiesByClassName[$className] = $strategy;
+        }
+
+        // Placed ahead of the strategies it ties with: the sort is stable, so the latest registered ranks first
+        array_unshift($this->allStrategies, $strategy);
+        usort(
+            $this->allStrategies,
+            static fn (
+                HeadElementSerializationStrategyInterface $a,
+                HeadElementSerializationStrategyInterface $b
+            ): int => $b->getPriority() <=> $a->getPriority()
+        );
+        $this->resolvedByElementClass = [];
     }
 
     /**
@@ -66,17 +88,18 @@ class SerializationStrategyRegistry implements SerializationStrategyRegistryInte
      */
     public function getStrategyForElement(HeadElementInterface $element): ?HeadElementSerializationStrategyInterface
     {
-        // First try to find by exact class name
         $className = get_class($element);
         if (isset($this->strategiesByClassName[$className])) {
             return $this->strategiesByClassName[$className];
         }
 
-        // Fallback: iterate through all strategies and find one that can handle this element
+        if (isset($this->resolvedByElementClass[$className])) {
+            return $this->resolvedByElementClass[$className];
+        }
+
         foreach ($this->allStrategies as $strategy) {
             if ($strategy->canHandle($element)) {
-                // Cache the result for future use
-                $this->strategiesByClassName[$className] = $strategy;
+                $this->resolvedByElementClass[$className] = $strategy;
                 return $strategy;
             }
         }
@@ -124,5 +147,20 @@ class SerializationStrategyRegistry implements SerializationStrategyRegistryInte
         $this->strategiesByType = [];
         $this->strategiesByClassName = [];
         $this->allStrategies = [];
+        $this->resolvedByElementClass = [];
+    }
+
+    /**
+     * Tell whether a strategy takes the place of the one stored for the same key
+     *
+     * @param HeadElementSerializationStrategyInterface $candidate the strategy being registered
+     * @param HeadElementSerializationStrategyInterface|null $stored the strategy already stored, if any
+     * @return bool true when nothing is stored or the candidate's priority is higher or equal
+     */
+    private function outranks(
+        HeadElementSerializationStrategyInterface $candidate,
+        ?HeadElementSerializationStrategyInterface $stored
+    ): bool {
+        return $stored === null || $candidate->getPriority() >= $stored->getPriority();
     }
 }

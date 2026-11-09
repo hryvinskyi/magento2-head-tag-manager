@@ -1,24 +1,25 @@
 <?php
 /**
- * Copyright (c) 2025. Volodymyr Hryvinskyi. All rights reserved.
+ * Copyright (c) 2025-2026. Volodymyr Hryvinskyi. All rights reserved.
  * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
  * GitHub: https://github.com/hryvinskyi
  */
 
+declare(strict_types=1);
+
 namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement;
 
-use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
+use Hryvinskyi\Base\Exception\InvalidParamException;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElement;
-use Magento\Framework\View\Helper\SecureHtmlRenderer;
-use PHPUnit\Framework\MockObject\MockObject;
+use Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement\Fixture\ElementServices;
 use PHPUnit\Framework\TestCase;
 
 class StyleElementTest extends TestCase
 {
     /**
-     * @var SecureHtmlRenderer&MockObject
+     * @var ElementServices
      */
-    private MockObject $secureHtmlRenderer;
+    private ElementServices $services;
 
     /**
      * @var StyleElement
@@ -27,11 +28,8 @@ class StyleElementTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->secureHtmlRenderer = $this->createMock(SecureHtmlRenderer::class);
-        $this->styleElement = new StyleElement(
-            $this->secureHtmlRenderer,
-            $this->createMock(AttributeRendererInterface::class)
-        );
+        $this->services = new ElementServices();
+        $this->styleElement = new StyleElement($this->services->secureHtmlRenderer());
     }
 
     public function testCanSetAndGetContent(): void
@@ -39,38 +37,60 @@ class StyleElementTest extends TestCase
         $content = 'body { color: red; }';
         $this->styleElement->setContent($content);
 
-        $this->assertEquals($content, $this->styleElement->getContent());
+        $this->assertSame($content, $this->styleElement->getContent());
     }
 
     public function testRendersStyleWithContent(): void
     {
-        $content = 'body { color: red; }';
-        $this->styleElement->setContent($content);
-        $this->secureHtmlRenderer->expects($this->once())
-            ->method('renderTag')
-            ->with('style', [], $content, false)
-            ->willReturn('<style>body { color: red; }</style>');
+        $this->styleElement->setContent('body { color: red; }');
 
-        $this->assertEquals('<style>body { color: red; }</style>', $this->styleElement->render());
+        $this->assertSame('<style>body { color: red; }</style>', $this->styleElement->render());
     }
 
     public function testRendersStyleWithAttributes(): void
     {
-        $attributes = ['type' => 'text/css', 'media' => 'screen'];
-        $this->styleElement->setAttributes($attributes);
-        $this->secureHtmlRenderer->expects($this->once())
-            ->method('renderTag')
-            ->with('style', $attributes, '', false)
-            ->willReturn('<style type="text/css" media="screen"></style>');
+        $this->styleElement->setAttributes(['type' => 'text/css', 'media' => 'screen']);
 
-        $this->assertEquals('<style type="text/css" media="screen"></style>', $this->styleElement->render());
+        $this->assertSame('<style type="text/css" media="screen"></style>', $this->styleElement->render());
+    }
+
+    /**
+     * `false` and `null` leave the attribute out, `true` gives its boolean form, numbers and `Stringable`s their text
+     */
+    public function testRendersEveryAttributeValueTypeByOneRule(): void
+    {
+        $this->styleElement->setAttributes([
+            'media' => 'screen',
+            'disabled' => false,
+            'nonce' => null,
+            'blocking' => true,
+            'data-version' => 2,
+            'data-weight' => 0.5,
+            'title' => $this->stringable('Theme'),
+        ]);
+
+        $this->assertSame(
+            '<style title="Theme" media="screen" blocking="" data-version="2" data-weight="0.5"></style>',
+            $this->styleElement->render()
+        );
+    }
+
+    /**
+     * An array has no text form; the element reports it instead of rendering "Array"
+     */
+    public function testAnArrayAttributeValueFailsToRender(): void
+    {
+        $this->styleElement->setAttribute('media', ['screen', 'print']);
+
+        $this->expectException(InvalidParamException::class);
+
+        $this->styleElement->render();
     }
 
     public function testConstructorTakesAttributesContentAndSortOrder(): void
     {
         $element = new StyleElement(
-            $this->secureHtmlRenderer,
-            $this->createMock(AttributeRendererInterface::class),
+            $this->services->secureHtmlRenderer(),
             ['media' => 'screen'],
             'body { color: red; }',
             7
@@ -79,5 +99,39 @@ class StyleElementTest extends TestCase
         $this->assertSame(['media' => 'screen'], $element->getAttributes());
         $this->assertSame('body { color: red; }', $element->getContent());
         $this->assertSame(7, $element->getSortOrder());
+    }
+
+    /**
+     * A style built without a sort order takes the same default as one built by its factory
+     */
+    public function testDefaultSortOrderIs10(): void
+    {
+        $this->assertSame(10, $this->styleElement->getSortOrder());
+    }
+
+    /**
+     * Builds a value object whose text form is the given string
+     *
+     * @param string $text
+     * @return \Stringable
+     */
+    private function stringable(string $text): \Stringable
+    {
+        return new class ($text) implements \Stringable {
+            /**
+             * @param string $text
+             */
+            public function __construct(private readonly string $text)
+            {
+            }
+
+            /**
+             * @inheritDoc
+             */
+            public function __toString(): string
+            {
+                return $this->text;
+            }
+        };
     }
 }

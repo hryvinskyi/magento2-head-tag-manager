@@ -11,18 +11,22 @@ namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\Serializer\Strategy;
 
 use Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElement;
+use Hryvinskyi\HeadTagManager\Model\Serializer\StorableAttributes;
 use Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\ScriptElementSerializationStrategy;
 use PHPUnit\Framework\TestCase;
 
 class ScriptElementSerializationStrategyTest extends TestCase
 {
+    /** @var HeadElementFactoryRegistryInterface */
     private HeadElementFactoryRegistryInterface $factoryRegistry;
+
+    /** @var ScriptElementSerializationStrategy */
     private ScriptElementSerializationStrategy $strategy;
 
     protected function setUp(): void
     {
         $this->factoryRegistry = $this->createMock(HeadElementFactoryRegistryInterface::class);
-        $this->strategy = new ScriptElementSerializationStrategy($this->factoryRegistry);
+        $this->strategy = new ScriptElementSerializationStrategy($this->factoryRegistry, new StorableAttributes());
     }
 
     public function testGetElementType(): void

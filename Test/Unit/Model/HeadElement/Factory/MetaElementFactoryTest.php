@@ -12,12 +12,10 @@ namespace Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement\Factory;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\Factory\MetaElementFactory;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElementFactory as MetaElementObjectFactory;
+use Hryvinskyi\HeadTagManager\Test\Unit\Model\HeadElement\Fixture\ElementServices;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-/**
- * Test for MetaElementFactory
- */
 class MetaElementFactoryTest extends TestCase
 {
     /**
@@ -26,66 +24,76 @@ class MetaElementFactoryTest extends TestCase
     private MockObject $elementFactory;
 
     /**
+     * @var list<mixed> the data of every call to the generated factory
+     */
+    private array $generatedFactoryCalls = [];
+
+    /**
      * @var MetaElementFactory
      */
     private MetaElementFactory $factory;
 
     protected function setUp(): void
     {
+        $services = new ElementServices();
         $this->elementFactory = $this->createMock(MetaElementObjectFactory::class);
+        $this->elementFactory->method('create')->willReturnCallback(
+            function (mixed ...$arguments) use ($services): MetaElement {
+                $this->generatedFactoryCalls[] = $arguments[0] ?? [];
+
+                return new MetaElement($services->attributeRenderer());
+            }
+        );
         $this->factory = new MetaElementFactory($this->elementFactory);
     }
 
     /**
-     * The generated factory is asked with the element's constructor parameter names and its element is returned
+     * The caller's data is applied through the element, so none of it reaches the object manager
      */
-    public function testAsksTheGeneratedFactoryWithConstructorParameterNames(): void
+    public function testAppliesTheDataThroughTheElement(): void
     {
-        $element = $this->createMock(MetaElement::class);
-        $this->elementFactory->expects($this->once())
-            ->method('create')
-            ->with([
-                'attributes' => ['name' => 'description', 'content' => 'Test'],
-                'sortOrder' => 7,
-            ])
-            ->willReturn($element);
-
-        $this->assertSame($element, $this->factory->create([
-            'attributes' => ['name' => 'description', 'content' => 'Test'],
+        $element = $this->factory->create([
+            'attributes' => ['name' => 'robots', 'content' => 'noindex'],
             'sort_order' => 7,
-        ]));
+        ]);
+
+        $this->assertSame([[]], $this->generatedFactoryCalls);
+        $this->assertInstanceOf(MetaElement::class, $element);
+        $this->assertSame(['name' => 'robots', 'content' => 'noindex'], $element->getAttributes());
+        $this->assertSame(7, $element->getSortOrder());
+        $this->assertSame('<meta name="robots" content="noindex">', $element->render());
     }
 
     /**
-     * Keys the element does not know are not passed on, and what is missing takes the defaults
+     * Attribute data the object manager would read as instructions is kept as plain attribute values
      */
-    public function testAppliesDefaultsAndIgnoresUnknownKeys(): void
+    public function testKeepsAttributeValuesTheObjectManagerWouldInterpret(): void
     {
-        $element = $this->createMock(MetaElement::class);
-        $this->elementFactory->expects($this->once())
-            ->method('create')
-            ->with([
-                'attributes' => [],
-                'sortOrder' => 100,
-            ])
-            ->willReturn($element);
+        $element = $this->factory->create(['attributes' => ['data' => ['instance' => 'hero'], 'argument' => 'x']]);
 
-        $this->assertSame($element, $this->factory->create(['other_field' => 'ignored']));
+        $this->assertSame([[]], $this->generatedFactoryCalls);
+        $this->assertSame(['data' => ['instance' => 'hero'], 'argument' => 'x'], $element->getAttributes());
     }
 
     /**
-     * Test getElementType returns correct type
+     * What the data leaves out takes the element's defaults
      */
+    public function testAppliesDefaultsForMissingData(): void
+    {
+        $element = $this->factory->create();
+
+        $this->assertInstanceOf(MetaElement::class, $element);
+        $this->assertSame([], $element->getAttributes());
+        $this->assertSame(100, $element->getSortOrder());
+    }
+
     public function testGetElementType(): void
     {
-        $this->assertEquals('meta', $this->factory->getElementType());
+        $this->assertSame('meta', $this->factory->getElementType());
     }
 
-    /**
-     * Test getElementClassName returns correct class name
-     */
     public function testGetElementClassName(): void
     {
-        $this->assertEquals(MetaElement::class, $this->factory->getElementClassName());
+        $this->assertSame(MetaElement::class, $this->factory->getElementClassName());
     }
 }

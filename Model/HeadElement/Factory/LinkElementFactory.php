@@ -9,7 +9,6 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Model\HeadElement\Factory;
 
-use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\LinkElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\LinkElementFactory as LinkElementObjectFactory;
 
@@ -27,17 +26,19 @@ class LinkElementFactory extends AbstractHeadElementFactory
     }
 
     /**
-     * Create the link element
-     *
-     * @param array<string,mixed> $data the element's `attributes` and `sort_order`
-     * @return HeadElementInterface
+     * @inheritDoc
      */
-    public function create(array $data = []): HeadElementInterface
+    protected function createElement(array $data): LinkElement
     {
-        return $this->elementFactory->create([
-            'attributes' => $data['attributes'] ?? [],
-            'sortOrder' => $data['sort_order'] ?? 100,
-        ]);
+        return $this->elementFactory->create();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function getDefaultSortOrder(): int
+    {
+        return 100;
     }
 
     /**

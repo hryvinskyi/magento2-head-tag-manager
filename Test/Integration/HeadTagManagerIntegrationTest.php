@@ -9,10 +9,7 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\HeadTagManager\Test\Integration;
 
-use Hryvinskyi\Base\Api\Html\AttributeRendererInterface;
-use Hryvinskyi\HeadTagManager\Api\Block\BlockCacheDetectorInterface;
-use Hryvinskyi\HeadTagManager\Api\Block\HeadElementTrackerInterface;
-use Hryvinskyi\HeadTagManager\Api\Cache\BlockHeadElementCacheInterface;
+use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementFactoryInterface;
 use Hryvinskyi\HeadTagManager\Api\HeadElement\HeadElementInterface;
 use Hryvinskyi\HeadTagManager\Api\HeadTagManagerInterface;
 use Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface;
@@ -22,20 +19,20 @@ use Hryvinskyi\HeadTagManager\Model\HeadElement\AbstractHeadElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\Factory\MetaElementFactory;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\Factory\ScriptElementFactory;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\LinkElement;
+use Hryvinskyi\HeadTagManager\Model\HeadElement\LinkElementFactory as LinkElementObjectFactory;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\MetaElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\ScriptElement;
 use Hryvinskyi\HeadTagManager\Model\HeadElement\StyleElement;
 use Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\MetaElementSerializationStrategy;
-use Magento\Framework\View\Element\AbstractBlock;
-use Magento\Framework\View\Helper\SecureHtmlRenderer;
 use Magento\TestFramework\Helper\Bootstrap;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The factory registry, the serializer and the head tag manager resolved through the real container, the block-level
- * caching flow included
+ * The factory registry, the serializer and the head tag manager resolved through the real container
  *
  * Elements come from the registry, so the pool's wiring and the generated element factories are exercised with them.
+ *
+ * @phpstan-import-type HeadElementData from HeadElementFactoryInterface
  */
 class HeadTagManagerIntegrationTest extends TestCase
 {
@@ -80,7 +77,7 @@ class HeadTagManagerIntegrationTest extends TestCase
      * Creates an element through the factory the registry holds for its type.
      *
      * @param string $type the element type
-     * @param array<string, mixed> $data the data the factory takes
+     * @param HeadElementData $data the data the factory takes
      * @return HeadElementInterface
      */
     private function element(string $type, array $data = []): HeadElementInterface
@@ -175,7 +172,8 @@ class HeadTagManagerIntegrationTest extends TestCase
     }
 
     /**
-     * Script and style tags are rendered by the secure renderer the container injects
+     * Script and style tags are rendered by the secure renderer the container injects, in render order: a style,
+     * whose default sort order is lower, ahead of a script
      */
     public function testScriptAndStyleRenderThroughTheSecureRenderer(): void
     {
@@ -185,11 +183,47 @@ class HeadTagManagerIntegrationTest extends TestCase
 
         self::assertSame(
             [
-                'script' => '<script src="https://example.com/a.js"></script>',
                 'style' => '<style media="print">a{}</style>',
+                'script' => '<script src="https://example.com/a.js"></script>',
             ],
             $manager->getRenderedElements()
         );
+    }
+
+    /**
+     * An external script the content security processor reads no host from is written as text by the container's
+     * attribute renderer, and an element built by the generated factory stores its constructor attribute names in
+     * lower case
+     */
+    public function testALocalExternalScriptIsTextAndConstructorNamesAreLowerCased(): void
+    {
+        $manager = $this->emptyManager();
+        $manager->addExternalScript('/media/js/x.js', ['defer' => true], 'local');
+
+        self::assertSame(['local' => '<script src="/media/js/x.js" defer></script>'], $manager->getRenderedElements());
+
+        $link = $this->service(LinkElementObjectFactory::class)->create(
+            ['attributes' => ['HREF' => '/a.css', 'REL' => 'stylesheet']]
+        );
+        self::assertSame(['href' => '/a.css', 'rel' => 'stylesheet'], $link->getAttributes());
+        self::assertSame('<link href="/a.css" rel="stylesheet">', $link->render());
+    }
+
+    /**
+     * Data as a layout passes it reaches the element the way the object manager used to coerce it: a numeric string
+     * sort order becomes an int, and a translated phrase as content becomes its text
+     */
+    public function testRegistryFactoriesReadLayoutStyleData(): void
+    {
+        $factory = $this->factoryRegistry->getFactoryByType('script');
+        self::assertNotNull($factory);
+        $create = new \ReflectionMethod($factory, 'create');
+
+        $script = $create->invoke($factory, ['sort_order' => '7', 'content' => __('run();')]);
+
+        self::assertInstanceOf(ScriptElement::class, $script);
+        self::assertSame(7, $script->getSortOrder());
+        self::assertSame('run();', $script->getContent());
     }
 
     public function testCompleteSerializationAndDeserializationFlow(): void
@@ -208,17 +242,15 @@ class HeadTagManagerIntegrationTest extends TestCase
         // Serialize elements
         $serializedData = $this->serializer->serialize($elements);
 
-        // Verify serialized data structure
+        // Verify serialized data structure: the element type finds the module's own factory, so no class is stored
         self::assertSame(
             [
                 'meta_description' => [
-                    'type' => MetaElement::class,
                     'short_type' => 'meta',
                     'attributes' => ['name' => 'description', 'content' => 'Test'],
                     'sort_order' => 100,
                 ],
                 'inline_script' => [
-                    'type' => ScriptElement::class,
                     'short_type' => 'script',
                     'attributes' => ['type' => 'text/javascript'],
                     'sort_order' => 100,
@@ -320,17 +352,18 @@ class HeadTagManagerIntegrationTest extends TestCase
     public function testSerializationWithoutStrategy(): void
     {
         // Create an unknown element class for testing
-        $unknownElement = new class (
-            $this->service(SecureHtmlRenderer::class),
-            $this->service(AttributeRendererInterface::class),
-            ['custom' => 'attribute']
-        ) extends AbstractHeadElement {
+        $unknownElement = new class (['custom' => 'attribute']) extends AbstractHeadElement {
             /**
              * @inheritDoc
              */
             public function render(): string
             {
-                return '<unknown' . $this->attributesToString() . '>';
+                $html = '<unknown';
+                foreach ($this->getTextAttributes() as $name => $text) {
+                    $html .= ' ' . $name . '="' . $text . '"';
+                }
+
+                return $html . '>';
             }
         };
 
@@ -351,92 +384,5 @@ class HeadTagManagerIntegrationTest extends TestCase
             $serializedData
         );
         self::assertSame('<unknown custom="attribute">', $unknownElement->render());
-    }
-
-    public function testBlockLevelCachingFlow(): void
-    {
-        // Create mocks for block-level caching components
-        $blockCache = $this->createMock(BlockHeadElementCacheInterface::class);
-        $cacheDetector = $this->createMock(BlockCacheDetectorInterface::class);
-        $elementTracker = $this->createMock(HeadElementTrackerInterface::class);
-
-        // Mock a block
-        $block = $this->createMock(AbstractBlock::class);
-        $block->method('getNameInLayout')->willReturn('test_block');
-        $block->method('getCacheKey')->willReturn('test_cache_key');
-
-        // Test scenario: Block is cacheable and not cached yet (will be rendered)
-        $cacheDetector->method('isBlockCacheable')->with($block)->willReturn(true);
-        $cacheDetector->method('isBlockCached')->with($block)->willReturn(false);
-
-        // Create test elements
-        $newElements = [
-            'meta_test' => $this->element('meta', ['attributes' => ['name' => 'test', 'content' => 'value']]),
-        ];
-
-        // Test tracker flow
-        $elementTracker->expects($this->once())
-            ->method('isBlockBeingTracked')
-            ->with($block)
-            ->willReturn(true);
-
-        $elementTracker->expects($this->once())
-            ->method('stopTrackingAndGetNewElements')
-            ->with($block)
-            ->willReturn($newElements);
-
-        // Test cache saving
-        $blockCache->expects($this->once())
-            ->method('saveBlockHeadElements')
-            ->with($block, $newElements);
-
-        // Simulate the flow that would happen in BlockHtmlAfterObserver
-        if ($elementTracker->isBlockBeingTracked($block)) {
-            $trackedElements = $elementTracker->stopTrackingAndGetNewElements($block);
-
-            if ($cacheDetector->isBlockCacheable($block)) {
-                if (!$cacheDetector->isBlockCached($block) && !empty($trackedElements)) {
-                    $blockCache->saveBlockHeadElements($block, $trackedElements);
-                }
-            }
-        }
-    }
-
-    public function testBlockCacheRestoration(): void
-    {
-        // Test cache restoration flow
-        $headTagManager = $this->createMock(HeadTagManagerInterface::class);
-        $blockCache = $this->createMock(BlockHeadElementCacheInterface::class);
-
-        // Mock a block
-        $block = $this->createMock(AbstractBlock::class);
-        $block->method('getNameInLayout')->willReturn('cached_block');
-        $block->method('getCacheKey')->willReturn('cached_block_key');
-
-        // Create cached elements
-        $cachedMetaElement = $this->element('meta', ['attributes' => ['name' => 'cached', 'content' => 'data']]);
-        $cachedElements = ['cached_meta' => $cachedMetaElement];
-
-        // Mock cache loading
-        $blockCache->expects($this->once())
-            ->method('loadBlockHeadElements')
-            ->with($block)
-            ->willReturn($cachedElements);
-
-        // Mock head tag manager restoration
-        $headTagManager->expects($this->once())
-            ->method('addElement')
-            ->with($cachedMetaElement, 'cached_meta');
-
-        // Simulate cache restoration
-        $loadedElements = $blockCache->loadBlockHeadElements($block);
-
-        if (!empty($loadedElements)) {
-            foreach ($loadedElements as $key => $element) {
-                $headTagManager->addElement($element, $key);
-            }
-        }
-
-        self::assertEquals($cachedElements, $loadedElements);
     }
 }

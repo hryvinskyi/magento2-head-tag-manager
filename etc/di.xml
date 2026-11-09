@@ -13,20 +13,41 @@
     <!-- Interface Preferences -->
     <preference for="Hryvinskyi\HeadTagManager\Api\HeadTagManagerInterface"
                 type="Hryvinskyi\HeadTagManager\Model\HeadTagManager"/>
-    <preference for="Hryvinskyi\HeadTagManager\Api\Cache\HeadElementCacheStrategyInterface"
-                type="Hryvinskyi\HeadTagManager\Model\Cache\HeadElementCacheStrategy"/>
     <preference for="Hryvinskyi\HeadTagManager\Api\Serializer\HeadElementSerializerInterface"
                 type="Hryvinskyi\HeadTagManager\Model\Serializer\HeadElementSerializer"/>
     <preference for="Hryvinskyi\HeadTagManager\Api\Registry\HeadElementFactoryRegistryInterface"
                 type="Hryvinskyi\HeadTagManager\Model\Registry\HeadElementFactoryRegistry"/>
     <preference for="Hryvinskyi\HeadTagManager\Api\Serializer\Strategy\SerializationStrategyRegistryInterface"
                 type="Hryvinskyi\HeadTagManager\Model\Serializer\Strategy\SerializationStrategyRegistry"/>
-    <preference for="Hryvinskyi\HeadTagManager\Api\Block\BlockCacheDetectorInterface"
-                type="Hryvinskyi\HeadTagManager\Model\Block\BlockCacheDetector"/>
-    <preference for="Hryvinskyi\HeadTagManager\Api\Block\HeadElementTrackerInterface"
-                type="Hryvinskyi\HeadTagManager\Model\Block\HeadElementTracker"/>
-    <preference for="Hryvinskyi\HeadTagManager\Api\Cache\BlockHeadElementCacheInterface"
-                type="Hryvinskyi\HeadTagManager\Model\Cache\BlockHeadElementCache"/>
+    <preference for="Hryvinskyi\HeadTagManager\Api\Serializer\StorableAttributesInterface"
+                type="Hryvinskyi\HeadTagManager\Model\Serializer\StorableAttributes"/>
+    <preference for="Hryvinskyi\HeadTagManager\Api\Cache\CachedBlockHtmlCodecInterface"
+                type="Hryvinskyi\HeadTagManager\Model\Cache\CachedBlockHtmlCodec"/>
+    <preference for="Hryvinskyi\HeadTagManager\Api\Cache\BlockHtmlCacheLoaderInterface"
+                type="Hryvinskyi\HeadTagManager\Model\Cache\BlockHtmlCacheLoader"/>
+
+    <!-- A block's head elements are stored in and restored from its own block HTML cache entry -->
+    <type name="Magento\Framework\Cache\LockGuardedCacheLoader">
+        <plugin name="hryvinskyi_head_tag_manager_block_html_entry"
+                type="Hryvinskyi\HeadTagManager\Plugin\Framework\Cache\LockGuardedCacheLoader"/>
+    </type>
+    <!-- The loader's first call comes from the configuration cache during bootstrap: build the service lazily -->
+    <type name="Hryvinskyi\HeadTagManager\Plugin\Framework\Cache\LockGuardedCacheLoader">
+        <arguments>
+            <argument name="cacheLoader" xsi:type="object">Hryvinskyi\HeadTagManager\Api\Cache\BlockHtmlCacheLoaderInterface\Proxy</argument>
+            <argument name="blockCacheKeyPrefixes" xsi:type="array">
+                <item name="block" xsi:type="const">Magento\Framework\View\Element\AbstractBlock::CACHE_KEY_PREFIX</item>
+                <item name="custom_block" xsi:type="const">Magento\Framework\View\Element\AbstractBlock::CUSTOM_CACHE_KEY_PREFIX</item>
+                <item name="cms_block" xsi:type="const">Magento\Cms\Block\Block::CACHE_KEY_PREFIX</item>
+                <item name="cms_block_by_identifier" xsi:type="const">Magento\Cms\Block\BlockByIdentifier::CACHE_KEY_PREFIX</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Hryvinskyi\HeadTagManager\Model\Cache\CachedBlockHtmlCodec">
+        <arguments>
+            <argument name="base64JsonSerializer" xsi:type="object">Magento\Framework\Serialize\Serializer\Base64Json</argument>
+        </arguments>
+    </type>
 
     <!-- Factory Registry Configuration -->
     <type name="Hryvinskyi\HeadTagManager\Model\Registry\HeadElementFactoryRegistry">

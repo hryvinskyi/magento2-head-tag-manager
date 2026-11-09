@@ -11,7 +11,7 @@
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
     <!-- Plugin for Result Head Tag Injection - runs before page cache -->
     <type name="Magento\Framework\Controller\ResultInterface">
-        <!-- Our plugin should executes before magento full page cache -->
+        <!-- The page cache's plugin stores the rendered page: it runs after the head is injected -->
         <plugin name="result-builtin-cache" sortOrder="101" />
         <plugin name="hryvinskyi_head_tag_manager_result_injection"
                 type="Hryvinskyi\HeadTagManager\Plugin\Framework\Controller\Result"
